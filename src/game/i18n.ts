@@ -90,6 +90,8 @@ const fr = {
     sound: "Son",
     save: "Sauvegarde",
     savedAt: "Sauvegardé à {time}",
+    sla: "{n} min",
+    overtime: "Délai dépassé — Lena relance",
   },
   priority: {
     low: "Basse",
@@ -278,6 +280,14 @@ const fr = {
     noMissions: "Aucune mission terminée.",
     employee: "Employé",
     days: "Jours dans l'entreprise",
+    dossier: "Dossier de carrière",
+    noDossier: "Aucune décision enregistrée. Vos choix de tickets apparaîtront ici.",
+    late: "Hors délai",
+    onTime: "Dans les temps",
+  },
+  dossier: {
+    overtime: "Mission hors délai — relance de Lena",
+    overtimeChat: "Le ticket dépasse le délai. Termine et rapporte — la direction suit.",
   },
   cert: {
     certificate: "ATTESTATION DE RÉUSSITE",
@@ -1143,6 +1153,7 @@ const fr = {
     chapter2: "Chapitre 2 disponible dans l'Académie",
     chapter3: "Chapitre 3 disponible dans l'Académie",
     chapter4: "Chapitre 4 disponible dans l'Académie",
+    overtime: "Délai de ticket dépassé — Lena Kovac",
   },
   intro: {
     day: "LUNDI — JOUR 1",
@@ -1275,6 +1286,8 @@ const en: Dict = {
     sound: "Sound",
     save: "Save",
     savedAt: "Saved at {time}",
+    sla: "{n} min",
+    overtime: "SLA missed — Lena is following up",
   },
   priority: {
     low: "Low",
@@ -1463,6 +1476,14 @@ const en: Dict = {
     noMissions: "No mission completed yet.",
     employee: "Employee",
     days: "Days in the company",
+    dossier: "Career file",
+    noDossier: "No decisions recorded yet. Your ticket choices will show up here.",
+    late: "Overtime",
+    onTime: "On time",
+  },
+  dossier: {
+    overtime: "Mission overtime — Lena followed up",
+    overtimeChat: "The ticket is past its SLA. Finish and report — management is watching.",
   },
   cert: {
     certificate: "CERTIFICATE OF ACHIEVEMENT",
@@ -2322,6 +2343,7 @@ const en: Dict = {
     chapter2: "Chapter 2 available in the Academy",
     chapter3: "Chapter 3 available in the Academy",
     chapter4: "Chapter 4 available in the Academy",
+    overtime: "Ticket SLA missed — Lena Kovac",
   },
   intro: {
     day: "MONDAY — DAY 1",

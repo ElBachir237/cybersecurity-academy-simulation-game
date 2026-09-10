@@ -206,6 +206,25 @@ export interface MissionRuntime {
   completedAt?: number;
   bestScore?: number;
   attempts: number;
+  /** In-game clock minute when the SLA expires. */
+  deadlineMin?: number;
+  overtime?: boolean;
+}
+
+export type CareerKind = "decision" | "overtime" | "error";
+
+export interface CareerEntry {
+  id: string;
+  at: number;
+  day: number;
+  missionId: string;
+  kind: CareerKind;
+  decisionId?: string;
+  choiceId?: string;
+  labelKey: string;
+  consequenceKey?: string;
+  positive: boolean;
+  repDelta?: number;
 }
 
 export interface DecisionOption {
@@ -424,6 +443,7 @@ export interface GameState {
   toasts: Toast[];
   editorOpen: EditorOpen | null;
   lastConsequence: { id: string; textKey?: string; text?: string; positive: boolean } | null;
+  dossier: CareerEntry[];
   savedAt: number;
   startedAt: number;
 }

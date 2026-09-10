@@ -935,5 +935,55 @@ console.log("\n[23] OLD SAVE — missing c4_lab runtime still starts after chapt
   assert(e.state.world.hosts["PC-WIN"]?.os.includes("Windows"), "PC-WIN hydrated onto old save");
 }
 
+console.log("\n[24] E2 — mission SLA clock");
+{
+  const e = newEngine();
+  const startRep = e.state.reputation;
+  e.startMission("c1_lab");
+  const rt = e.state.missions["c1_lab"];
+  assert(typeof rt.deadlineMin === "number", "deadline set on start");
+  assert(rt.deadlineMin === e.state.timeMin + 12, "SLA matches estimateMin");
+  assert(e.remainingMin() === 12, "12 minutes remaining");
+  const deadline = rt.deadlineMin!;
+  while (e.state.timeMin < deadline) e.tick();
+  assert(e.state.missions["c1_lab"].overtime === true, "overtime flagged at SLA");
+  assert(e.state.missions["c1_lab"].errorKeys.includes("overtime"), "overtime error key");
+  assert(e.state.reputation < startRep, "reputation hit");
+  assert(e.state.dossier.some((d) => d.kind === "overtime"), "career file records overtime");
+  e.tick();
+  e.tick();
+  assert(e.state.dossier.filter((d) => d.kind === "overtime").length === 1, "overtime recorded once");
+}
+
+console.log("\n[25] E2 — career file records a decision");
+{
+  const e = newEngine();
+  e.startMission("c1_lab");
+  run(e, "WS-001", "help");
+  run(e, "WS-001", "whoami");
+  run(e, "WS-001", "hostname");
+  run(e, "WS-001", "ip addr");
+  run(e, "WS-001", "ping 192.168.10.1");
+  run(e, "WS-001", "ping 10.0.0.10");
+  run(e, "WS-001", "ping intranet.horizon");
+  run(e, "WS-001", "cat /etc/resolv.conf");
+  e.writeFile("WS-001", "/etc/resolv.conf", "nameserver 10.0.0.10\n");
+  run(e, "WS-001", "ping intranet.horizon");
+  e.startMission("c1_mission");
+  e.answerDecision("B");
+  assert(
+    e.state.dossier.some((d) => d.kind === "decision" && d.choiceId === "B" && d.missionId === "c1_mission"),
+    "call decision is in the career file"
+  );
+}
+
+console.log("\n[26] E2 — old save without dossier hydrates");
+{
+  const e = newEngine();
+  delete (e.state as { dossier?: unknown }).dossier;
+  e.startMission("c1_lab");
+  assert(Array.isArray(e.state.dossier), "dossier array after hydrate");
+}
+
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

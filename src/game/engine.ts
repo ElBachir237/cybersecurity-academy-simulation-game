@@ -7,6 +7,7 @@
 
 import type {
   AppId,
+  CareerEntry,
   Certificate,
   ChatMessage,
   DecisionOption,
@@ -64,7 +65,7 @@ const DHCP_LEASES: Record<string, [string, number, string]> = {
   "PC-PAUL": ["192.168.30.37", 24, "192.168.30.1"],
   "PC-WIN": ["192.168.10.55", 24, "192.168.10.1"],
   "PC-AMINA": ["192.168.10.61", 24, "192.168.10.1"],
-};
+}; // ip, cidr, gateway
 
 function uid(prefix = "id"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -192,6 +193,7 @@ export function createInitialState(profile: Profile): GameState {
     toasts: [],
     editorOpen: null,
     lastConsequence: null,
+    dossier: [],
     savedAt: 0,
     startedAt: Date.now(),
   };
@@ -270,6 +272,7 @@ export function hydrateProgression(state: GameState): GameState {
     chapter,
     missions,
     completedMissions: [...completed],
+    dossier: Array.isArray(state.dossier) ? state.dossier : [],
     world: {
       ...state.world,
       hosts,
@@ -550,6 +553,7 @@ export class GameEngine {
     let mode: GameState["sound"]["mode"] = "calm";
     if (s.world.financeOutage) mode = "crisis";
     else if (s.pendingDecision?.kind === "call") mode = "tense";
+    else if (s.activeMissionId && s.missions[s.activeMissionId]?.overtime) mode = "crisis";
     else if (s.activeMissionId && s.missions[s.activeMissionId]?.status === "active")
       mode = s.activeMissionId === "c1_sim" ? "tense" : "investigation";
     else if (s.debrief) mode = "resolved";
@@ -934,6 +938,8 @@ export class GameEngine {
       forcedVariant ??
       (def.hasVariants ? pool[Math.floor(Math.random() * pool.length)] : "default");
     rt.startedAt = Date.now();
+    rt.deadlineMin = this.state.timeMin + Math.max(4, def.estimateMin);
+    rt.overtime = false;
     this.state.activeMissionId = id;
     this.state.debrief = null;
     this.state.learning = null;
@@ -1042,6 +1048,18 @@ export class GameEngine {
       textKey: option.consequenceKey,
       positive: !!option.correct,
     };
+    if (rt) {
+      this.recordCareer({
+        kind: option.correct ? "decision" : "error",
+        missionId: rt.id,
+        decisionId: d.id,
+        choiceId: choiceId,
+        labelKey: option.labelKey,
+        consequenceKey: option.consequenceKey,
+        positive: !!option.correct,
+        repDelta: option.rep,
+      });
+    }
     if (option.correct) audio.success();
     else audio.error();
     const def = rt ? getMission(rt.id) : undefined;
@@ -1221,6 +1239,7 @@ export class GameEngine {
       this.state.timeMin -= 24 * 60;
       this.state.day += 1;
     }
+    this.checkDeadline();
     // Rare ambient life: optional notifications / distractions.
     if (Math.random() < 0.04 && this.state.notifications.length < 25) {
       const pool = [
@@ -1239,6 +1258,52 @@ export class GameEngine {
       this.fx().notify({ ...pick, kind: "soc" });
     }
     this.dispatch({ type: "tick" });
+  }
+
+  private checkDeadline(): void {
+    const rt = this.activeRuntime();
+    if (!rt || rt.status !== "active" || rt.deadlineMin == null) return;
+    if (this.state.timeMin < rt.deadlineMin || rt.overtime) return;
+    rt.overtime = true;
+    if (!rt.errorKeys.includes("overtime")) {
+      rt.errors += 1;
+      rt.errorKeys.push("overtime");
+    }
+    this.state.reputation = Math.max(0, this.state.reputation - 4);
+    this.recordCareer({
+      kind: "overtime",
+      missionId: rt.id,
+      labelKey: "dossier.overtime",
+      positive: false,
+      repDelta: -4,
+    });
+    this.fx().notify({
+      severity: "high",
+      source: "IT Service Desk",
+      titleKey: "notifyContent.overtime",
+      kind: "it",
+      linkMission: rt.id,
+    });
+    this.fx().chat("itsupport", "lena", this.t("dossier.overtimeChat"));
+    this.pushToast({ kind: "consequence", textKey: "hud.overtime", positive: false });
+    audio.alert();
+  }
+
+  private recordCareer(entry: Omit<CareerEntry, "id" | "at" | "day">): void {
+    const row: CareerEntry = {
+      ...entry,
+      id: uid("cv"),
+      at: this.state.timeMin,
+      day: this.state.day,
+    };
+    this.state.dossier = [row, ...(this.state.dossier ?? [])].slice(0, 80);
+  }
+
+  /** Minutes left on the active mission SLA (negative when overtime). */
+  remainingMin(): number | null {
+    const rt = this.activeRuntime();
+    if (!rt || rt.status !== "active" || rt.deadlineMin == null) return null;
+    return rt.deadlineMin - this.state.timeMin;
   }
 
   // ---------------- Save ----------------

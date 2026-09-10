@@ -119,7 +119,7 @@ export default function Desktop() {
         </div>
         <div className="hz-topbar-location"><span />{fr ? "Siège · Bureau 3B" : "HQ · Office 3B"}</div>
         <div className="hz-topbar-tools">
-          <span className="hz-clock"><Icon name="clock" size={14} /><span className="hz-day">{t("hud.day", { day: state.day })}</span><b>{fmtClock(state.timeMin)}</b></span>
+          <span className="hz-clock"><Icon name="clock" size={14} /><span className="hz-day">{t("hud.day", { day: state.day })}</span><b>{fmtClock(state.timeMin)}</b>{mission && mission.deadlineMin != null && <em className={`hz-deadline ${mission.overtime || mission.deadlineMin - state.timeMin <= 2 ? "is-late" : mission.deadlineMin - state.timeMin <= Math.ceil((missionDef?.estimateMin ?? 8) / 2) ? "is-warn" : ""}`} data-testid="mission-sla">{mission.overtime || mission.deadlineMin - state.timeMin < 0 ? t("hud.overtime") : t("hud.sla", { n: mission.deadlineMin - state.timeMin })}</em>}</span>
           <button type="button" className="hz-tool-button" onClick={() => engine.setLang(fr ? "en" : "fr")} aria-label={fr ? "Passer en anglais" : "Switch to French"}>{fr ? "FR" : "EN"}</button>
           <button type="button" className="hz-tool-button hz-sound-button" onClick={() => setShowSound(true)} aria-label={t("hud.sound")}><Icon name={state.sound.muted ? "volumeOff" : "volume"} size={17} /></button>
           <button type="button" className="hz-tool-button hz-save-button" onClick={() => void save()} disabled={saving} aria-label={t("hud.save")} title={t("save.manual")}><Icon name="save" size={17} /></button>
@@ -156,7 +156,7 @@ export default function Desktop() {
         <section className="hz-mission-strip">
           <span className="hz-mission-icon"><Icon name={mission ? "target" : "building"} size={22} /></span>
           <div className="hz-mission-copy">
-            <div className="hz-eyebrow">{fr ? "CHAPITRE" : "CHAPTER"} {state.chapter}<span>/</span>{state.chapter === 1 ? "FIRST DAY" : state.chapter === 3 ? t("chapter3.title").toUpperCase() : t("chapter2.title").toUpperCase()}{mission && <span className="hz-mission-live">{fr ? "EN COURS" : "IN PROGRESS"}</span>}</div>
+            <div className="hz-eyebrow">{fr ? "CHAPITRE" : "CHAPTER"} {state.chapter}<span>/</span>{(() => { const key = `chapter${state.chapter}.title`; const v = t(key); return (v === key ? (state.chapter === 1 ? "FIRST DAY" : "") : v).toUpperCase(); })()}{mission && <span className="hz-mission-live">{mission.overtime ? t("portfolio.late") : (fr ? "EN COURS" : "IN PROGRESS")}</span>}</div>
             <h1>{missionDef ? t(missionDef.titleKey) : `${fr ? "Bienvenue" : "Welcome"}, ${state.profile?.name ?? ""}.`}</h1>
             <p>{state.currentObjective ? t(state.currentObjective) : t("hud.noObjective")}</p>
           </div>
@@ -217,6 +217,7 @@ export default function Desktop() {
         <div className="hz-objectives-modal">
           <div className="hz-dialog-heading"><div><span className="hz-eyebrow">{t("hud.mission")}</span><h2>{missionDef ? t(missionDef.titleKey) : ""}</h2></div><button type="button" className="hz-tool-button" onClick={() => setShowObjectives(false)} aria-label={t("common.close")}><Icon name="x" size={18} /></button></div>
           <p className="hz-objectives-context">{state.currentObjective ? t(state.currentObjective) : ""}</p>
+          {mission?.deadlineMin != null && <p className={`hz-sla-line ${mission.overtime ? "is-late" : ""}`}>{mission.overtime ? t("hud.overtime") : t("hud.sla", { n: Math.max(0, mission.deadlineMin - state.timeMin) })}</p>}
           <ol className="hz-task-list">{tasks.map((task, index) => <li key={task.id} data-done={mission?.tasks[task.id]?.done}><span>{mission?.tasks[task.id]?.done ? <Icon name="success" size={17} /> : String(index + 1).padStart(2, "0")}</span><p>{t(task.labelKey)}</p></li>)}</ol>
           {missionDef?.kind !== "simulation" && <button type="button" className="hz-btn hz-btn-ghost" onClick={() => {
             const task = tasks.find((item) => !mission?.tasks[item.id]?.done && item.hintKey);

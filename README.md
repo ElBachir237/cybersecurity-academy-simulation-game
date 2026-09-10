@@ -36,7 +36,7 @@ Un bureau **HORIZON OS** avec des fenêtres, des notifications, du son, et une s
 | **Network** | Topologie, hôtes, calculateur CIDR |
 | **SOC** | Alertes et triage (socle, encore peu de contenu) |
 | **Files / Tickets / Browser** | Contexte d’entreprise |
-| **Skills / Portfolio** | Compétences, badges, certificats |
+| **Skills / Portfolio** | Compétences, badges, certificats, dossier de carrière |
 
 Le terminal n’est pas un décor. Les commandes **lisent et mutent le même état** que la carte réseau et les missions. Chaque famille d’équipement a **son** CLI / son UI (pas un faux langage unique) :
 
@@ -126,8 +126,8 @@ Le nombre de chapitres **peut augmenter**. L’essentiel : **notions, compétenc
 ### Règles de vie (tous les chapitres à venir)
 
 - **Contexte de chapitre** : seuls les éléments du palier sont exigés ; le siège s’enrichit, il n’est pas reset.
-- **Temps imparti** : missions et examens ont une horloge (crise, direction qui relance). Dépasser le délai = score, réputation, parfois un ticket d’escalade — comme au bureau.
-- **Dossier de carrière** : chaque décision (laisser un trou, mal rassurer Marie, isoler trop large) s’inscrit sur le personnage. Les chapitres suivants peuvent la rappeler.
+- **Temps imparti** : chaque mission a un SLA (`estimateMin` sur l’horloge in-game). Dépasser = relance de Lena, réputation, entrée au dossier, pénalité de score — le ticket reste closable.
+- **Dossier de carrière** : décisions et hors-délai s’inscrivent dans le **Portfolio**. Les chapitres suivants peuvent les rappeler.
 - **Équipe** (après le SOC L1) : rôles helpdesk / admin / SOC L1–L2, partie partagée, vue formateur. Pas avant d’avoir un métier solo jouable.
 - **Atelier architecture** (mode bac à sable, débloqué progressivement) : tu **poses** le matériel (MikroTik, pfSense, UniFi Gateway, switch, serveurs, AP, caméras), tu **câbles**, tu **configures** avec le CLI / l’UI de chaque marque, tu **héberges** des sites (intranet, vitrine, reverse proxy), tu **simules** le trafic. C’est le Packet Tracer d’HORIZON, branché sur les compétences déjà apprises — pas un second jeu déconnecté.
 
@@ -265,7 +265,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | --- | --- | --- |
 | **E0** | Document de vision | Alignement produit |
 | **E1** | Ch. 4 Helpdesk : Windows + `ipconfig`/`netsh` + Wi-Fi/AP | **Fait** |
-| **E2** | Horloge de mission + dossier de carrière (décisions persistantes) | Pression « monde réel » |
+| **E2** | Horloge de mission + dossier de carrière (décisions persistantes) | **Fait** |
 | **E3** | Ch. 5 Systèmes + AD simulé + **hébergement** (vhost nginx, site visible dans Browser) | Admin + sites |
 | **E4** | Ch. 6 : **pfSense + MikroTik RouterOS + passerelle UniFi** (plus le FW générique seul) | Quotidien réseau réel |
 | **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | « Je construis le siège » |
@@ -276,7 +276,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
 | **E11** | Ch. 14–15 GRC + capstone | Management / expert |
 
-**Prochaine implémentation :** étape **E2** (horloge de mission + dossier de carrière), puis **E3** (systèmes + AD + hébergement). Pas le SOC, pas l’atelier 5★.
+**Prochaine implémentation :** étape **E3** (systèmes + AD simulé + hébergement web). Pas le SOC, pas l’atelier 5★.
 
 ---
 
@@ -448,7 +448,7 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | SOC, certificats serveur, classe | Amorcé |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est un **début de carrière IT** (helpdesk Linux → adressage → segmentation → **helpdesk Windows / Wi-Fi**). Ce n’est pas encore l’académie complète (pfSense, MikroTik, hébergement, AD, SOC, architecture 5★). La suite utile : **E2** (timer + dossier), puis **E3**.
+Le prototype est un **début de carrière IT** (helpdesk Linux → adressage → segmentation → helpdesk Windows / Wi-Fi), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (pfSense, MikroTik, hébergement, AD, SOC, architecture 5★). La suite utile : **E3**.
 
 ---
 

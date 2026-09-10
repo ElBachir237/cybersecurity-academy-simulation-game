@@ -468,6 +468,27 @@ export function PortfolioApp() {
           )}
         </Section>
 
+        {/* career file */}
+        <Section title={t("portfolio.dossier")} icon="scroll">
+          <div className="space-y-1.5">
+            {(state.dossier ?? []).slice(0, 24).map((row) => (
+              <div key={row.id} className="flex items-start gap-3 rounded-lg border border-hz-border px-3 py-2">
+                <Icon name={row.positive ? "success" : "warning"} size={15} className={row.positive ? "text-hz-green mt-0.5" : "text-hz-amber mt-0.5"} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12.5px] font-semibold">{t(row.labelKey)}</p>
+                  <p className="mt-0.5 text-[11px] text-hz-muted">
+                    {t("hud.day", { day: row.day })} · {t(`missions.${row.missionId}.title`)}
+                    {row.kind === "overtime" ? ` · ${t("portfolio.late")}` : ""}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {!(state.dossier ?? []).length && (
+              <p className="text-[12px] text-hz-muted">{t("portfolio.noDossier")}</p>
+            )}
+          </div>
+        </Section>
+
         {/* missions */}
         <Section title={t("portfolio.missions")} icon="target">
           <div className="space-y-1.5">
