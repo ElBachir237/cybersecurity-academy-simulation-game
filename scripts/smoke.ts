@@ -440,6 +440,63 @@ function completeC4Desk(e: GameEngine) {
   e.sendChat("itsupport", "compte et spooler ok");
 }
 
+function completeC4Sim(e: GameEngine) {
+  e.startMission("c4_sim", "link");
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c4_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  run(e, "PC-WIN", "netsh interface set interface name=Ethernet admin=ENABLED");
+  run(e, "PC-WIN", "ping intranet.horizon");
+  e.sendChat("itsupport", "rapport: PC-WIN ok");
+}
+
+function completeChapter4(e: GameEngine) {
+  completeC4Lab(e);
+  completeC4Wifi(e);
+  completeC4Desk(e);
+  completeC4Sim(e);
+}
+
+function completeChapter4Ready(): GameEngine {
+  const e = completeChapter3Ready();
+  completeChapter4(e);
+  return e;
+}
+
+function completeC5Lab(e: GameEngine) {
+  e.startMission("c5_lab");
+  run(e, "SRV-WEB", "hostname");
+  run(e, "SRV-WEB", "sudo systemctl status nginx");
+  run(e, "SRV-WEB", "journalctl -u nginx");
+  run(e, "SRV-WEB", "sudo systemctl start nginx");
+  run(e, "WS-001", "curl intranet.horizon");
+}
+
+function completeC5Web(e: GameEngine) {
+  e.startMission("c5_web");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.c5_web.mailTicketSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "dig rh.horizon.local");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "DNS-01", "sudo nsupdate add rh.horizon.local A 10.0.0.20");
+  run(e, "SRV-WEB", "sudo ln -s /etc/nginx/sites-available/rh.horizon.local /etc/nginx/sites-enabled/rh.horizon.local");
+  run(e, "WS-001", "curl rh.horizon.local");
+  e.sendChat("itsupport", "rh.horizon.local 200");
+}
+
+function completeC5Ad(e: GameEngine) {
+  e.startMission("c5_ad");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.c5_ad.mailTicketSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "SRV-DC", "samba-tool user list");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "SRV-DC", "samba-tool user create jmorel Horizon!2024");
+  run(e, "SRV-DC", "samba-tool user show jmorel");
+  e.sendChat("itsupport", "compte jmorel cree");
+}
+
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
 {
   const e = newEngine();
@@ -983,6 +1040,165 @@ console.log("\n[26] E2 — old save without dossier hydrates");
   delete (e.state as { dossier?: unknown }).dossier;
   e.startMission("c1_lab");
   assert(Array.isArray(e.state.dossier), "dossier array after hydrate");
+}
+
+console.log("\n[27] CHAPTER 5 LAB c5_lab");
+{
+  const e = completeChapter4Ready();
+  assert(e.state.missions["c5_lab"].status === "available", "c5_lab unlocked after chapter 4");
+  assert(e.state.world.hosts["SRV-DC"]?.os.includes("Samba"), "SRV-DC hydrated onto world");
+  e.startMission("c5_lab");
+  assert(e.state.world.hosts["SRV-WEB"]?.services.nginx === "failed", "nginx starts failed");
+  const down = run(e, "WS-001", "curl intranet.horizon").join("\n");
+  assert(down.includes("refused") || down.toLowerCase().includes("fail"), "curl fails while nginx is down");
+  completeC5Lab(e);
+  assert(e.state.missions["c5_lab"].status === "completed", "c5_lab completed");
+  const up = run(e, "WS-001", "curl intranet.horizon").join("\n");
+  assert(up.includes("200"), "intranet 200 after nginx start");
+  assert(e.state.world.hosts["COMP-01"]?.services.smbd === "active", "smbd left running");
+  assert(e.state.missions["c5_web"].status === "available", "c5_web unlocked");
+}
+
+console.log("\n[28] CHAPTER 5 WEB c5_web");
+{
+  const e = completeChapter4Ready();
+  completeC5Lab(e);
+  e.startMission("c5_web");
+  assert(e.state.activeMissionId === "c5_web", "c5_web started");
+  assert(!e.state.world.dns?.["rh.horizon.local"], "RH name not in DNS yet");
+  assert(e.state.world.vhosts?.["rh.horizon.local"]?.enabled === false, "vhost disabled");
+  const nx = run(e, "WS-001", "dig rh.horizon.local").join("\n");
+  assert(nx.includes("NXDOMAIN"), "NXDOMAIN before nsupdate");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c5_web.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "dig rh.horizon.local");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "DNS-01", "sudo nsupdate add rh.horizon.local A 10.0.0.20");
+  assert(e.state.world.dns?.["rh.horizon.local"] === "10.0.0.20", "A record added");
+  const listed = run(e, "SRV-WEB", "ls /etc/nginx/sites-enabled").join("\n");
+  assert(!listed.includes("rh.horizon.local") || listed.includes("(empty)") || !listed.split("\n").includes("rh.horizon.local"), "site not enabled yet");
+  run(e, "SRV-WEB", "sudo ln -s /etc/nginx/sites-available/rh.horizon.local /etc/nginx/sites-enabled/rh.horizon.local");
+  assert(e.state.world.vhosts?.["rh.horizon.local"]?.enabled === true, "vhost enabled");
+  const page = run(e, "WS-001", "curl rh.horizon.local").join("\n");
+  assert(page.includes("200") && page.toLowerCase().includes("rh"), "RH site 200");
+  e.sendChat("itsupport", "portail RH en ligne");
+  assert(e.state.missions["c5_web"].status === "completed", "c5_web completed");
+  assert(e.state.missions["c5_ad"].status === "available", "c5_ad unlocked");
+}
+
+console.log("\n[28b] CHAPTER 5 ERROR — skip DNS");
+{
+  const e = completeChapter4Ready();
+  completeC5Lab(e);
+  e.startMission("c5_web");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c5_web.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "dig rh.horizon.local");
+  assert(e.state.pendingDecision?.id === "c5w_marc", "skip-DNS decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["c5_web"].errorKeys.includes("skip_dns"), "error recorded");
+  run(e, "DNS-01", "sudo nsupdate add rh.horizon.local A 10.0.0.20");
+  run(e, "SRV-WEB", "sudo ln -s /etc/nginx/sites-available/rh.horizon.local /etc/nginx/sites-enabled/rh.horizon.local");
+  run(e, "WS-001", "curl rh.horizon.local");
+  e.sendChat("itsupport", "quand meme en ligne");
+  assert(e.state.missions["c5_web"].status === "completed", "still completable");
+  assert(e.state.missions["c5_web"].score < 100, "score penalized");
+}
+
+console.log("\n[29] CHAPTER 5 AD c5_ad");
+{
+  const e = completeChapter4Ready();
+  completeC5Lab(e);
+  completeC5Web(e);
+  e.startMission("c5_ad");
+  assert(!e.state.world.directory?.jmorel, "jmorel absent at start");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c5_ad.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  const listed = run(e, "SRV-DC", "samba-tool user list").join("\n");
+  assert(!listed.includes("jmorel"), "user list has no jmorel");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "SRV-DC", "samba-tool user create jmorel Horizon!2024");
+  assert(e.state.world.directory?.jmorel?.enabled === true, "jmorel created");
+  const show = run(e, "SRV-DC", "samba-tool user show jmorel").join("\n");
+  assert(show.includes("jmorel") && show.includes("Domain Users"), "show lists Domain Users");
+  e.sendChat("itsupport", "compte jmorel pret");
+  assert(e.state.missions["c5_ad"].status === "completed", "c5_ad completed");
+  assert(e.state.missions["c5_sim"].status === "available", "c5_sim unlocked");
+}
+
+console.log("\n[29b] CHAPTER 5 ERROR — Domain Admins");
+{
+  const e = completeChapter4Ready();
+  completeC5Lab(e);
+  completeC5Web(e);
+  e.startMission("c5_ad");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c5_ad.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "SRV-DC", "samba-tool user list");
+  assert(e.state.pendingDecision?.id === "c5a_admin", "Domain Admins decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["c5_ad"].errorKeys.includes("domain_admins"), "error recorded");
+  run(e, "SRV-DC", "samba-tool user create jmorel Horizon!2024");
+  run(e, "SRV-DC", "samba-tool user show jmorel");
+  e.sendChat("itsupport", "compte cree malgre tout");
+  assert(e.state.missions["c5_ad"].status === "completed", "still completable");
+  assert(e.state.missions["c5_ad"].score < 100, "score penalized");
+}
+
+for (const variant of ["nginx", "vhost", "ad"] as const) {
+  console.log(`\n[30] SIM c5_sim variant=${variant}`);
+  const e = completeChapter4Ready();
+  completeC5Lab(e);
+  completeC5Web(e);
+  completeC5Ad(e);
+  e.startMission("c5_sim", variant);
+  assert(e.state.missions["c5_sim"].variant === variant, `variant is ${variant}`);
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c5_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  if (variant === "nginx") {
+    assert(e.state.world.hosts["SRV-WEB"]?.services.nginx === "failed", "nginx down");
+    run(e, "SRV-WEB", "sudo systemctl start nginx");
+    const verify = run(e, "WS-001", "curl intranet.horizon").join("\n");
+    assert(verify.includes("200"), `[${variant}] intranet verified`);
+  } else if (variant === "vhost") {
+    assert(e.state.world.vhosts?.["rh.horizon.local"]?.enabled === false, "vhost disabled");
+    run(e, "SRV-WEB", "sudo ln -s /etc/nginx/sites-available/rh.horizon.local /etc/nginx/sites-enabled/rh.horizon.local");
+    const verify = run(e, "WS-001", "curl rh.horizon.local").join("\n");
+    assert(verify.includes("200"), `[${variant}] RH site verified`);
+  } else {
+    assert(e.state.world.directory?.jmorel?.locked === true, "jmorel locked");
+    run(e, "SRV-DC", "samba-tool user unlock jmorel");
+    const show = run(e, "SRV-DC", "samba-tool user show jmorel").join("\n");
+    assert(show.includes("NORMAL_ACCOUNT"), `[${variant}] account unlocked`);
+  }
+  e.sendChat("itsupport", "rapport: incident systemes clos");
+  const s = e.state.missions["c5_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed (status=${s.status})`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "Systems Technician"),
+    `[${variant}] Systems Technician certificate`
+  );
+  assert(e.state.chapter >= 6, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[31] OLD SAVE — missing c5_lab runtime still starts after chapter 4");
+{
+  const e = completeChapter4Ready();
+  delete e.state.missions["c5_lab"];
+  delete e.state.missions["c5_web"];
+  delete e.state.missions["c5_ad"];
+  delete e.state.missions["c5_sim"];
+  e.startMission("c5_lab");
+  assert(e.state.activeMissionId === "c5_lab", "c5_lab starts from a save that lacked chapter 5 runtimes");
+  assert(e.state.world.hosts["SRV-DC"]?.os.includes("Samba"), "SRV-DC hydrated onto old save");
+  assert(Array.isArray(Object.keys(e.state.world.directory ?? {})), "directory hydrated");
 }
 
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);

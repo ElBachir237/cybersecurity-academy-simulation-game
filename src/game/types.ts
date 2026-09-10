@@ -123,6 +123,22 @@ export interface SwitchPort {
   state: "up" | "down";
 }
 
+export interface Vhost {
+  serverName: string;
+  enabled: boolean;
+  title: string;
+  body: string;
+}
+
+export interface DirectoryUser {
+  sam: string;
+  displayName: string;
+  ou: string;
+  groups: string[];
+  enabled: boolean;
+  locked: boolean;
+}
+
 export interface GameWorld {
   hosts: Record<string, HostRuntime>;
   dns: Record<string, string>; // name -> ip
@@ -134,6 +150,8 @@ export interface GameWorld {
   fwRules: FwRule[];
   switchPorts: SwitchPort[];
   enforceAccessVlan?: boolean;
+  vhosts?: Record<string, Vhost>;
+  directory?: Record<string, DirectoryUser>;
 }
 
 // ---------------- Mail / Chat / Notifications ----------------

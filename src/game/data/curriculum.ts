@@ -70,6 +70,7 @@ export const SKILLS: SkillDef[] = [
   { id: "threat_hunting", label: { fr: "Threat Hunting", en: "Threat hunting" }, track: "soc", prereq: ["siem"] },
   // Web
   { id: "http", label: { fr: "HTTP", en: "HTTP" }, track: "web", prereq: ["internet_basics"] },
+  { id: "web_hosting", label: { fr: "Hébergement web", en: "Web hosting" }, track: "web", prereq: ["http", "linux_admin"] },
   { id: "auth", label: { fr: "Authentification", en: "Authentication" }, track: "web", prereq: ["http"] },
   { id: "api_security", label: { fr: "Sécurité des API", en: "API security" }, track: "web", prereq: ["auth"] },
   { id: "web_security", label: { fr: "Sécurité Web", en: "Web security" }, track: "web", prereq: ["http"] },
@@ -145,7 +146,14 @@ export const CHAPTERS: ChapterDef[] = [
     theoryKeys: ["c4_win", "c4_wifi", "c4_desk"],
     missionIds: ["c4_lab", "c4_wifi", "c4_desk", "c4_sim"],
   },
-  { id: 5, titleKey: "Systèmes & AD", status: "soon", theoryKeys: [], missionIds: [] },
+  {
+    id: 5,
+    titleKey: "chapter5",
+    subKey: "chapter5",
+    status: "released",
+    theoryKeys: ["c5_svc", "c5_vhost", "c5_ad"],
+    missionIds: ["c5_lab", "c5_web", "c5_ad", "c5_sim"],
+  },
   { id: 6, titleKey: "Admin réseau", status: "soon", theoryKeys: [], missionIds: [] },
   { id: 7, titleKey: "SOC L1", status: "soon", theoryKeys: [], missionIds: [] },
   { id: 8, titleKey: "SOC L2", status: "soon", theoryKeys: [], missionIds: [] },
@@ -169,6 +177,9 @@ export const BADGES: BadgeDef[] = [
   { id: "methodical", icon: "target", nameKey: "badges.methodical.name", descKey: "badges.methodical.desc" },
   { id: "firewall_architect", icon: "brick", nameKey: "badges.firewall_architect.name", descKey: "badges.firewall_architect.desc" },
   { id: "subnet_planner", icon: "layers", nameKey: "badges.subnet_planner.name", descKey: "badges.subnet_planner.desc" },
+  { id: "service_restarter", icon: "server", nameKey: "badges.service_restarter.name", descKey: "badges.service_restarter.desc" },
+  { id: "web_host", icon: "globe", nameKey: "badges.web_host.name", descKey: "badges.web_host.desc" },
+  { id: "directory_clerk", icon: "users", nameKey: "badges.directory_clerk.name", descKey: "badges.directory_clerk.desc" },
 ];
 
 export interface TitleDef {
@@ -228,6 +239,13 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 4",
     missionIds: ["c4_lab", "c4_wifi", "c4_desk", "c4_sim"],
     skills: ["windows_admin", "wifi", "computer_basics", "network_diag"],
+  },
+  {
+    id: "sys_tech",
+    titleKey: "Systems Technician",
+    level: "Chapter 5",
+    missionIds: ["c5_lab", "c5_web", "c5_ad", "c5_sim"],
+    skills: ["linux_admin", "services", "web_hosting", "active_directory"],
   },
 ];
 

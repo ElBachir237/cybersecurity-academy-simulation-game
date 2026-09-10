@@ -5,7 +5,15 @@
 // tickets and NPC moods; the engine snapshots it into saves.
 // ============================================================
 
-import type { FwRule, GameState, HostRuntime, IfaceRuntime, SwitchPort } from "../types";
+import type {
+  DirectoryUser,
+  FwRule,
+  GameState,
+  HostRuntime,
+  IfaceRuntime,
+  SwitchPort,
+  Vhost,
+} from "../types";
 
 export const CORE_CIDR = "10.0.0.0/24";
 export const FINANCE_CIDR = "192.168.20.0/24";
@@ -378,6 +386,22 @@ export function seedHosts(): Record<string, HostRuntime> {
   });
 
   add({
+    id: "SRV-DC",
+    label: "SRV-DC — Contrôleur de domaine (Samba AD)",
+    os: "Debian 12 (Samba AD DC)",
+    room: "Baie 2",
+    ifaces: {
+      eth0: { state: "up", dhcp: false, ip: "10.0.0.11", cidr: 24, gw: "10.0.0.1" },
+    },
+    dns: ["10.0.0.10"],
+    services: { "samba-ad-dc": "active", "named": "active" },
+    logs: [
+      "Sep 12 08:00:01 srv-dc samba[412]: samba-ad-dc started",
+      "Sep 12 08:00:02 srv-dc samba[412]: domain HORIZON.LOCAL online",
+    ],
+  });
+
+  add({
     id: "SW-01",
     label: "SW-01 — Commutateur d'étage",
     os: "HP ProCurve (L2)",
@@ -502,8 +526,73 @@ export const DNS_ZONE: Record<string, string> = {
   "training.horizon": "10.0.0.24",
   "dns-01.horizon.local": "10.0.0.10",
   "srv-web.horizon.local": "10.0.0.20",
+  "srv-dc.horizon.local": "10.0.0.11",
   "comp-01.horizon.local": "10.0.0.30",
 };
+
+export function seedVhosts(): Record<string, Vhost> {
+  const fromSites = Object.entries(INTERNAL_SITES).map(([name, site]) => [
+    name,
+    { serverName: name, enabled: true, title: site.title, body: site.body },
+  ]);
+  return {
+    ...Object.fromEntries(fromSites),
+    "rh.horizon.local": {
+      serverName: "rh.horizon.local",
+      enabled: false,
+      title: "HORIZON RH",
+      body: "Portail RH interne — congés, bulletins, annuaire.",
+    },
+  };
+}
+
+export function seedDirectory(): Record<string, DirectoryUser> {
+  return {
+    lena: {
+      sam: "lena",
+      displayName: "Lena Kovac",
+      ou: "OU=IT,DC=horizon,DC=local",
+      groups: ["Domain Admins", "Domain Users"],
+      enabled: true,
+      locked: false,
+    },
+    student: {
+      sam: "student",
+      displayName: "Student (helpdesk)",
+      ou: "OU=IT,DC=horizon,DC=local",
+      groups: ["Domain Users"],
+      enabled: true,
+      locked: false,
+    },
+    amina: {
+      sam: "amina",
+      displayName: "Amina Diallo",
+      ou: "OU=Users,DC=horizon,DC=local",
+      groups: ["Domain Users"],
+      enabled: true,
+      locked: false,
+    },
+  };
+}
+
+/** HTTP site currently served by SRV-WEB (nginx up + vhost enabled). */
+export function httpSite(
+  name: string,
+  state: GameState
+): { title: string; body: string; status: number } | null {
+  const clean = name.replace(/^https?:\/\//, "").split("/")[0].split(":")[0].toLowerCase();
+  const web = state.world.hosts["SRV-WEB"];
+  if (!web || web.services.nginx !== "active") return null;
+  const vhosts = state.world.vhosts ?? {};
+  const vh = vhosts[clean];
+  if (vh) {
+    if (!vh.enabled) return { title: "Not Found", body: "404 Not Found — no enabled vhost", status: 404 };
+    return { title: vh.title, body: vh.body, status: 200 };
+  }
+  const catalog = INTERNAL_SITES[clean];
+  if (!catalog) return null;
+  return { title: catalog.title, body: catalog.body, status: 200 };
+}
 
 export const INTERNAL_SITES: Record<string, { title: string; body: string }> = {
   "intranet.horizon": {
@@ -530,6 +619,10 @@ export const INTERNAL_SITES: Record<string, { title: string; body: string }> = {
     title: "Académie HORIZON",
     body: "Plateforme de formation interne.",
   },
+  "rh.horizon.local": {
+    title: "HORIZON RH",
+    body: "Portail RH interne — congés, bulletins, annuaire.",
+  },
 };
 
 // ---------------- NPCs ----------------
@@ -548,6 +641,7 @@ export const NPCS: NpcDef[] = [
   { id: "soriya", nameKey: "npc.soriya", roleKey: "npc.soriyaRole", dept: "SOC" },
   { id: "nour", nameKey: "npc.nour", roleKey: "npc.nourRole", dept: "Produit" },
   { id: "amina", nameKey: "npc.amina", roleKey: "npc.aminaRole", dept: "Accueil" },
+  { id: "jules", nameKey: "npc.jules", roleKey: "npc.julesRole", dept: "RH" },
 ];
 
 // ---------------- Topology (for the Network app) ----------------
@@ -565,6 +659,7 @@ export const TOPO_NODES: TopoNode[] = [
   { id: "DNS-01", label: "DNS-01", kind: "server", x: 180, y: 200 },
   { id: "COMP-01", label: "COMP-01", kind: "server", x: 620, y: 200 },
   { id: "SRV-WEB", label: "SRV-WEB", kind: "server", x: 180, y: 310 },
+  { id: "SRV-DC", label: "SRV-DC", kind: "server", x: 80, y: 310 },
   { id: "WS-001", label: "WS-001", kind: "pc", x: 290, y: 310 },
   { id: "PC-MARIE", label: "PC-MARIE", kind: "pc", x: 400, y: 310 },
   { id: "PC-PAUL", label: "PC-PAUL", kind: "pc", x: 510, y: 310 },
@@ -580,6 +675,7 @@ export const TOPO_LINKS: [string, string][] = [
   ["RTR-HQ", "DNS-01"],
   ["RTR-HQ", "COMP-01"],
   ["SW-01", "SRV-WEB"],
+  ["SW-01", "SRV-DC"],
   ["SW-01", "WS-001"],
   ["SW-01", "PC-MARIE"],
   ["SW-01", "PC-PAUL"],

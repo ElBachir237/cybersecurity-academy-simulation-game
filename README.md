@@ -58,7 +58,7 @@ Ce sont des commandes **d’exploitation légitime** (admin, diag, durcissement)
 
 ## Campagne actuelle
 
-Le curriculum **jouable** aujourd’hui : chapitres **1, 2, 3 et 4**. La vision carrière (systèmes → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 5–10 en « à venir ».
+Le curriculum **jouable** aujourd’hui : chapitres **1 à 5**. La vision carrière (pfSense → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 6–10 en « à venir ».
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -115,6 +115,21 @@ Commandes lab : `ipconfig`, `ipconfig /all`, `ping`, `nslookup`, `netsh interfac
 
 Réussir le chapitre débloque le certificat **Service Desk Associate**.
 
+### Chapitre 5 — Systèmes & hébergement (`released`)
+
+Boucle **serveurs** : `SRV-WEB` (nginx), `COMP-01` (`smbd`), `SRV-DC` (Samba AD simulé). Le Navigateur n’affiche un site que si le DNS existe, nginx tourne, et le vhost est activé. Les vieilles saves reçoivent `SRV-DC` / vhosts / annuaire sans reset.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **nginx est tombé** (`c5_lab`) | Lab | `systemctl status/start nginx` sur `SRV-WEB` ; `curl intranet.horizon` ; ne pas casser `smbd` |
+| **Le site RH n’ouvre pas** (`c5_web`) | Mission | `sudo nsupdate add rh.horizon.local A 10.0.0.20` + `ln -s` du vhost ; skip DNS = erreur |
+| **Le compte de Jules** (`c5_ad`) | Mission | `samba-tool user create jmorel` ; Domain Admins = erreur |
+| **Simulation : systèmes** (`c5_sim`) | Simulation | Variantes `nginx` / `vhost` / `ad` |
+
+Commandes : `sudo systemctl status|start|reload nginx`, `journalctl -u nginx`, `ls /etc/nginx/sites-enabled`, `sudo ln -s /etc/nginx/sites-available/<site> /etc/nginx/sites-enabled/`, `sudo nsupdate add <nom> A <ip>` (DNS-01), `samba-tool user list|create|show|unlock` (SRV-DC), `curl`.
+
+Réussir le chapitre débloque le certificat **Systems Technician**.
+
 ---
 
 ## Vision : une carrière, pas un catalogue
@@ -167,13 +182,13 @@ Même politique, **syntaxes différentes** : un trou `0.0.0.0/0` se voit aussi b
 
 Chaque chapitre : **lab + tickets terrain + décision + examen à variantes**, certificat, skills branchées sur le moteur. Les titres ci-dessous sont le **but métier** ; l’Académie actuelle affiche encore 10 lignes « soon » — elles seront renommées / étendues au fur et à mesure.
 
-### Chapitres 1–4 — `released` (années 0–2)
+### Chapitres 1–5 — `released` (années 0–2)
 
-Helpdesk Linux, adressage, segmentation, **puis helpdesk Windows / Wi-Fi**. Voir ci-dessus.
+Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, **puis serveurs / nginx / AD simulé**. Voir ci-dessus.
 
-**Compétences déjà en jeu :** terminal, DNS, DHCP, IPv4/CIDR, VLAN, switching d’accès, firewall FORWARD, NAT trop ouvert, **ipconfig / netsh**, UniFi SSID/VLAN, compte Windows, spooler.
+**Compétences déjà en jeu :** terminal, DNS, DHCP, IPv4/CIDR, VLAN, switching d’accès, firewall FORWARD, NAT trop ouvert, **ipconfig / netsh**, UniFi SSID/VLAN, compte Windows, spooler, **systemctl / nginx / vhost / samba-tool**.
 
-### Chapitre 5 — Systèmes & hébergement (`next`)
+### Chapitre 5 — Systèmes & hébergement (`released`)
 
 **But :** administrer des **serveurs**, pas seulement dépanner un PC. Services, logs, sauvegarde, premier **annuaire**, et **mettre un site en ligne** dans le monde.
 
@@ -266,7 +281,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E0** | Document de vision | Alignement produit |
 | **E1** | Ch. 4 Helpdesk : Windows + `ipconfig`/`netsh` + Wi-Fi/AP | **Fait** |
 | **E2** | Horloge de mission + dossier de carrière (décisions persistantes) | **Fait** |
-| **E3** | Ch. 5 Systèmes + AD simulé + **hébergement** (vhost nginx, site visible dans Browser) | Admin + sites |
+| **E3** | Ch. 5 Systèmes + AD simulé + **hébergement** (vhost nginx, site visible dans Browser) | **Fait** |
 | **E4** | Ch. 6 : **pfSense + MikroTik RouterOS + passerelle UniFi** (plus le FW générique seul) | Quotidien réseau réel |
 | **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | « Je construis le siège » |
 | **E6** | Ch. 7 SOC L1 + app SOC branchée + timer | Porte d’entrée cyber |
@@ -276,7 +291,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
 | **E11** | Ch. 14–15 GRC + capstone | Management / expert |
 
-**Prochaine implémentation :** étape **E3** (systèmes + AD simulé + hébergement web). Pas le SOC, pas l’atelier 5★.
+**Prochaine implémentation :** étape **E4** (pfSense + MikroTik RouterOS + passerelle UniFi). Pas le SOC, pas l’atelier 5★.
 
 ---
 
@@ -448,7 +463,7 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | SOC, certificats serveur, classe | Amorcé |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est un **début de carrière IT** (helpdesk Linux → adressage → segmentation → helpdesk Windows / Wi-Fi), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (pfSense, MikroTik, hébergement, AD, SOC, architecture 5★). La suite utile : **E3**.
+Le prototype est un **début de carrière IT** (helpdesk Linux → adressage → segmentation → helpdesk Windows / Wi-Fi → **systèmes / nginx / AD simulé**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (pfSense, MikroTik, SOC, architecture 5★). La suite utile : **E4**.
 
 ---
 

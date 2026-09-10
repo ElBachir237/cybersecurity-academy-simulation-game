@@ -9,7 +9,6 @@ import type { GameState, HostRuntime } from "./types";
 import type { TFn } from "./i18n";
 import {
   DNS_ZONE,
-  INTERNAL_SITES,
   WIFI_CORP_SSID,
   WIFI_GUEST_SSID,
   associateWifi,
@@ -18,11 +17,13 @@ import {
   formatFwList,
   formatSwitchPorts,
   formatVlanTable,
+  httpSite,
   ipInCidr,
   isApOs,
   isWindowsOs,
   l2Allowed,
   primaryIface,
+  seedDirectory,
   seedFwRules,
   seedSwitchPorts,
 } from "./data/world";
@@ -70,23 +71,18 @@ export function resolveName(
   state: GameState
 ): string | null {
   const zoneName = name.replace(/\.$/, "").toLowerCase();
-  if (DNS_ZONE[zoneName]) {
-    // Resolution requires a configured DNS server that is a LIVE world host
-    // running an active DNS service (named / systemd-resolved) AND is
-    // network-reachable. A decommissioned IP fails resolution even when
-    // the gateway can route to it.
-    const dns = host.dns[0];
-    if (!dns) return null;
-    const dnsHost = Object.values(state.world.hosts).find((h) =>
-      Object.values(h.ifaces).some((i) => i.ip === dns)
-    );
-    if (!dnsHost) return null;
-    const svc = dnsHost.services["named"] ?? dnsHost.services["systemd-resolved"];
-    if (svc !== "active") return null;
-    if (!ipReachable(dns, host, state)) return null;
-    return DNS_ZONE[zoneName];
-  }
-  return null;
+  const ip = state.world.dns?.[zoneName] ?? DNS_ZONE[zoneName];
+  if (!ip) return null;
+  const dns = host.dns[0];
+  if (!dns) return null;
+  const dnsHost = Object.values(state.world.hosts).find((h) =>
+    Object.values(h.ifaces).some((i) => i.ip === dns)
+  );
+  if (!dnsHost) return null;
+  const svc = dnsHost.services["named"] ?? dnsHost.services["systemd-resolved"];
+  if (svc !== "active") return null;
+  if (!ipReachable(dns, host, state)) return null;
+  return ip;
 }
 
 type PathResult = "ok" | "no-iface" | "no-route" | "filtered";
@@ -236,8 +232,24 @@ function readFileInternal(path: string, host: HostRuntime, state: GameState): st
         "- Ne jamais redémarrer un serveur sans preuve.",
         "",
       ].join("\n");
-    default:
+    default: {
+      const nginxSite = path.match(/^\/etc\/nginx\/sites-(?:available|enabled)\/(.+)$/);
+      if (nginxSite) {
+        const name = nginxSite[1];
+        const vh = state.world.vhosts?.[name];
+        if (!vh) return null;
+        return [
+          `server {`,
+          `    listen 80;`,
+          `    server_name ${vh.serverName};`,
+          `    root /var/www/${vh.serverName};`,
+          `    index index.html;`,
+          `}`,
+          ``,
+        ].join("\n");
+      }
       return null;
+    }
   }
 }
 
@@ -570,6 +582,12 @@ function cmdSystemctl(args: string[], host: HostRuntime, t: TFn, sudo: boolean):
     signals.serviceRestart = { service: svc };
     return { out: [t("terminal.serviceStatus", { svc, status: "active" })], signals };
   }
+  if (action === "reload") {
+    if (host.services[svc] !== "active") {
+      return { out: [`Failed to reload ${svc}.service: Unit is not active.`], signals };
+    }
+    return { out: [`Reloaded ${svc}.service.`], signals };
+  }
   return { out: ["systemctl: action non supportée"], signals };
 }
 
@@ -605,22 +623,143 @@ function cmdCurl(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
   if (!ip || !ipReachable(ip, host, state)) {
     return [t("terminal.curlFail", { url })];
   }
-  const site = INTERNAL_SITES[hostName];
-  if (site) {
+  const web = state.world.hosts["SRV-WEB"];
+  if (!web || web.services.nginx !== "active") {
+    return [`curl: (7) Failed to connect to ${hostName} port 80: Connection refused`];
+  }
+  const site = httpSite(hostName, state);
+  if (!site) {
+    return [t("terminal.curlFail", { url })];
+  }
+  if (site.status === 404) {
     return [
-      `HTTP/1.1 200 OK`,
+      `HTTP/1.1 404 Not Found`,
       `Server: nginx/1.24.0 (simulation)`,
-      `Content-Type: text/html`,
       ``,
-      `<!DOCTYPE html>`,
-      `<html><head><title>${site.title}</title></head>`,
-      `<body>`,
-      `<h1>${site.title}</h1>`,
-      `<p>${site.body}</p>`,
-      `</body></html>`,
+      `<h1>404 Not Found</h1>`,
     ];
   }
-  return [t("terminal.curlFail", { url })];
+  return [
+    `HTTP/1.1 200 OK`,
+    `Server: nginx/1.24.0 (simulation)`,
+    `Content-Type: text/html`,
+    ``,
+    `<!DOCTYPE html>`,
+    `<html><head><title>${site.title}</title></head>`,
+    `<body>`,
+    `<h1>${site.title}</h1>`,
+    `<p>${site.body}</p>`,
+    `</body></html>`,
+  ];
+}
+
+function cmdNsupdate(args: string[], host: HostRuntime, state: GameState, sudo: boolean, t: TFn): string[] {
+  if (host.id !== "DNS-01") {
+    return ["nsupdate: this host cannot update the HORIZON zone — use DNS-01"];
+  }
+  if (!sudo) return [t("terminal.permissionDenied")];
+  if (args[0] !== "add") {
+    return ["nsupdate: usage: nsupdate add <name> A <ip>"];
+  }
+  const name = (args[1] ?? "").replace(/\.$/, "").toLowerCase();
+  const typ = (args[2] ?? "A").toUpperCase();
+  const ip = args[3] ?? "";
+  if (!name || typ !== "A" || !/^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
+    return ["nsupdate: usage: nsupdate add <name> A <ip>"];
+  }
+  state.world.dns = { ...(state.world.dns ?? {}), [name]: ip };
+  host.logs.push(`Sep 12 named: update add ${name} IN A ${ip}`);
+  return [`update add ${name} 3600 IN A ${ip}`, "update completed"];
+}
+
+function cmdLn(args: string[], host: HostRuntime, state: GameState, sudo: boolean, t: TFn): string[] {
+  if (!sudo) return [t("terminal.permissionDenied")];
+  const paths = args.filter((a) => !a.startsWith("-"));
+  const src = paths.find((p) => p.includes("sites-available")) ?? paths[0];
+  if (!src) return ["ln: missing file operand"];
+  const name = src.split("/").filter(Boolean).pop()?.toLowerCase();
+  if (!name || !state.world.vhosts?.[name]) {
+    return [`ln: failed to access '${src}': No such file or directory`];
+  }
+  if (host.id !== "SRV-WEB") {
+    return ["ln: nginx sites live on SRV-WEB"];
+  }
+  state.world.vhosts[name] = { ...state.world.vhosts[name], enabled: true };
+  host.logs.push(`Sep 12 nginx: enabled site ${name}`);
+  return [`'${src}' -> '/etc/nginx/sites-enabled/${name}'`];
+}
+
+function cmdSambaTool(args: string[], host: HostRuntime, state: GameState, t: TFn): string[] {
+  if (host.services["samba-ad-dc"] === undefined) {
+    return ["samba-tool: this host is not an AD DC (use SRV-DC)"];
+  }
+  const dir = (state.world.directory ??= seedDirectory());
+  const obj = args[0]?.toLowerCase();
+  const action = args[1]?.toLowerCase();
+  if (obj === "user" && action === "list") {
+    return Object.keys(dir).sort();
+  }
+  if (obj === "user" && action === "show") {
+    const sam = (args[2] ?? "").toLowerCase();
+    const u = dir[sam];
+    if (!u) return [`ERROR: Unable to find user "${sam}"`];
+    return [
+      `dn: CN=${u.displayName},${u.ou}`,
+      `sAMAccountName: ${u.sam}`,
+      `userAccountControl: ${u.locked ? "LOCKOUT" : u.enabled ? "NORMAL_ACCOUNT" : "ACCOUNTDISABLE"}`,
+      `memberOf: ${u.groups.join(", ")}`,
+    ];
+  }
+  if (obj === "user" && action === "create") {
+    const sam = (args[2] ?? "").toLowerCase();
+    if (!sam) return ["Usage: samba-tool user create <username> [password]"];
+    if (dir[sam]) return [`ERROR: User "${sam}" already exists`];
+    dir[sam] = {
+      sam,
+      displayName: sam,
+      ou: "OU=Users,DC=horizon,DC=local",
+      groups: ["Domain Users"],
+      enabled: true,
+      locked: false,
+    };
+    host.logs.push(`Sep 12 samba: created user ${sam}`);
+    return [`User '${sam}' created successfully`];
+  }
+  if (obj === "user" && (action === "enable" || action === "unlock")) {
+    const sam = (args[2] ?? "").toLowerCase();
+    const u = dir[sam];
+    if (!u) return [`ERROR: Unable to find user "${sam}"`];
+    u.enabled = true;
+    u.locked = false;
+    host.logs.push(`Sep 12 samba: ${action} ${sam}`);
+    return [`User '${sam}' ${action}d successfully`];
+  }
+  if (obj === "group" && action === "listmembers") {
+    const group = args[2] ?? "";
+    return Object.values(dir)
+      .filter((u) => u.groups.some((g) => g.toLowerCase() === group.toLowerCase()))
+      .map((u) => u.sam);
+  }
+  if (obj === "group" && action === "addmembers") {
+    const group = args[2] ?? "";
+    const sam = (args[3] ?? "").toLowerCase();
+    const u = dir[sam];
+    if (!group || !u) return ["Usage: samba-tool group addmembers <group> <username>"];
+    if (!u.groups.includes(group)) u.groups.push(group);
+    host.logs.push(`Sep 12 samba: added ${sam} to ${group}`);
+    return [`Added members to group ${group}`];
+  }
+  return [
+    "Usage: samba-tool user list|show|create|enable|unlock ...",
+    "       samba-tool group addmembers|listmembers ...",
+  ];
+}
+
+function cmdJournalctl(args: string[], host: HostRuntime): string[] {
+  const uIdx = args.findIndex((a) => a === "-u" || a === "--unit");
+  const unit = uIdx >= 0 ? (args[uIdx + 1] ?? "").replace(/\.service$/, "") : "";
+  const lines = host.logs.filter((l) => !unit || l.toLowerCase().includes(unit.toLowerCase()));
+  return lines.length ? lines.slice(-20) : ["-- No entries --"];
 }
 
 function ifaceByName(host: HostRuntime, name: string): string | undefined {
@@ -1065,6 +1204,11 @@ export function execTerminal(
       out.push("  sudo dhclient <iface>                — demander un bail DHCP");
       out.push("  sudo ip link set <iface> up|down     — activer une interface");
       out.push("  sudo iptables -L | -D <id> | -A ...  — politique FORWARD (simulée)");
+      out.push("  sudo nsupdate add <nom> A <ip>       — enregistrement DNS (DNS-01)");
+      out.push("  sudo ln -s .../sites-available/<vhost> .../sites-enabled/");
+      out.push("  samba-tool user list|create|show|unlock  — AD simulé (SRV-DC)");
+      out.push("  journalctl -u <svc>                  — journaux systemd");
+      out.push("  sudo nginx -t                        — tester la config nginx");
       out.push("  show vlan | show interfaces status   — ports du commutateur (SW-01)");
       out.push("  sudo switchport Gi0/14 vlan 40       — VLAN d'accès (SW-01)");
       out.push("  clear | history                      — écran / historique");
@@ -1137,7 +1281,7 @@ export function execTerminal(
       break;
     }
     case "ls": {
-      const path = args.find((a) => !a.startsWith("-")) ?? ".";
+      const path = (args.find((a) => !a.startsWith("-")) ?? ".").replace(/\/$/, "");
       if (path === "." || path === "/home/student") {
         out.push("README.txt  notes.txt");
       } else if (path === "/etc/netplan") {
@@ -1145,7 +1289,17 @@ export function execTerminal(
       } else if (path === "/var/log") {
         out.push("syslog  apt  dpkg.log");
       } else if (path === "/etc") {
-        out.push("hostname  hosts  netplan  os-release  resolv.conf");
+        out.push("hostname  hosts  netplan  nginx  os-release  resolv.conf");
+      } else if (path === "/etc/nginx") {
+        out.push("nginx.conf  sites-available  sites-enabled");
+      } else if (path === "/etc/nginx/sites-available") {
+        out.push(...Object.keys(state.world.vhosts ?? {}).sort());
+      } else if (path === "/etc/nginx/sites-enabled") {
+        const enabled = Object.entries(state.world.vhosts ?? {})
+          .filter(([, v]) => v.enabled)
+          .map(([k]) => k)
+          .sort();
+        out.push(...(enabled.length ? enabled : ["(empty)"]));
       } else {
         out.push(`ls: ${t("terminal.noSuchFile", { path })}`);
       }
@@ -1241,6 +1395,27 @@ export function execTerminal(
       break;
     case "switchport":
       out.push(...cmdSwitchport(args, host, state, sudo));
+      break;
+    case "nsupdate":
+      out.push(...cmdNsupdate(args, host, state, sudo, t));
+      break;
+    case "ln":
+      out.push(...cmdLn(args, host, state, sudo, t));
+      break;
+    case "samba-tool":
+      out.push(...cmdSambaTool(args, host, state, t));
+      break;
+    case "journalctl":
+      out.push(...cmdJournalctl(args, host));
+      break;
+    case "nginx":
+      if (args[0] === "-t" || args[0] === "-t") {
+        if (!sudo) out.push(t("terminal.permissionDenied"));
+        else {
+          out.push("nginx: the configuration file /etc/nginx/nginx.conf syntax is ok");
+          out.push("nginx: configuration file /etc/nginx/nginx.conf test is successful");
+        }
+      } else out.push("nginx: usage: nginx -t");
       break;
     case "ssh":
       out.push(`ssh: ${t("terminal.sshDenied")}`);

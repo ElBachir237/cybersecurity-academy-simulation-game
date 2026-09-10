@@ -38,9 +38,11 @@ import {
   DNS_ZONE,
   initialChat,
   initialMails,
+  seedDirectory,
   seedFwRules,
   seedHosts,
   seedSwitchPorts,
+  seedVhosts,
 } from "./data/world";
 import {
   MISSIONS,
@@ -146,6 +148,8 @@ export function createInitialState(profile: Profile): GameState {
       intranetUp: true,
       fwRules: seedFwRules(),
       switchPorts: seedSwitchPorts(),
+      vhosts: seedVhosts(),
+      directory: seedDirectory(),
       tickets: [
         {
           id: "IT-1041",
@@ -165,6 +169,7 @@ export function createInitialState(profile: Profile): GameState {
         soriya: { id: "soriya", mood: "neutral" },
         nour: { id: "nour", mood: "neutral" },
         amina: { id: "amina", mood: "neutral" },
+        jules: { id: "jules", mood: "neutral" },
       },
     },
     vfs: {},
@@ -252,6 +257,7 @@ export function hydrateProgression(state: GameState): GameState {
   const npc = { ...(state.world?.npc ?? {}) };
   if (!npc.nour) npc.nour = { id: "nour", mood: "neutral" };
   if (!npc.amina) npc.amina = { id: "amina", mood: "neutral" };
+  if (!npc.jules) npc.jules = { id: "jules", mood: "neutral" };
   const existingRules = state.world?.fwRules;
   let fwRules = Array.isArray(existingRules) ? existingRules : seedFwRules();
   if (!fwRules.some((r) => r.id === "FW-CORE")) {
@@ -267,6 +273,12 @@ export function hydrateProgression(state: GameState): GameState {
   if (completed.has("c2_sim")) chapter = Math.max(chapter, 3);
   if (completed.has("c3_sim")) chapter = Math.max(chapter, 4);
   if (completed.has("c4_sim")) chapter = Math.max(chapter, 5);
+  if (completed.has("c5_sim")) chapter = Math.max(chapter, 6);
+  const seededVhosts = seedVhosts();
+  const vhosts = { ...seededVhosts, ...(state.world?.vhosts ?? {}) };
+  const seededDir = seedDirectory();
+  const directory = { ...seededDir, ...(state.world?.directory ?? {}) };
+  const dns = { ...DNS_ZONE, ...(state.world?.dns ?? {}) };
   return {
     ...state,
     chapter,
@@ -279,6 +291,9 @@ export function hydrateProgression(state: GameState): GameState {
       npc,
       fwRules,
       switchPorts,
+      vhosts,
+      directory,
+      dns,
     },
   };
 }
@@ -958,6 +973,13 @@ export class GameEngine {
       this.openApp("network");
       return;
     }
+    if (def.id === "c5_web" || def.id === "c5_sim") {
+      this.openApp("mail");
+      this.openApp("browser");
+      this.openApp("terminal");
+      this.focusWindow("mail");
+      return;
+    }
     if (def.kind === "lab") {
       this.openApp("terminal");
       return;
@@ -1161,6 +1183,7 @@ export class GameEngine {
     if (this.state.completedMissions.includes("c2_sim")) this.state.chapter = Math.max(this.state.chapter, 3);
     if (this.state.completedMissions.includes("c3_sim")) this.state.chapter = Math.max(this.state.chapter, 4);
     if (this.state.completedMissions.includes("c4_sim")) this.state.chapter = Math.max(this.state.chapter, 5);
+    if (this.state.completedMissions.includes("c5_sim")) this.state.chapter = Math.max(this.state.chapter, 6);
 
     this.recomputeRecommendation();
     this.state.activeMissionId = null;

@@ -16,7 +16,8 @@ import {
   Modal,
   Avatar,
 } from "../ui";
-import { INTERNAL_SITES } from "@/game/data/world";
+import { httpSite, INTERNAL_SITES } from "@/game/data/world";
+import { resolveName } from "@/game/terminal";
 import { readHostFile } from "@/game/terminal";
 import { TRACKS, SKILLS, BADGES, TITLES } from "@/game/data/curriculum";
 import type { Certificate } from "@/game/types";
@@ -209,8 +210,13 @@ export function BrowserApp() {
   const go = (u: string) => {
     const clean = u.replace(/^https?:\/\//, "").split("/")[0];
     setUrl(clean);
-    setSite(INTERNAL_SITES[clean] ? clean : null);
+    const viewer = state.world.hosts["WS-001"];
+    const ip = viewer ? resolveName(clean, viewer, state) : null;
+    const page = ip ? httpSite(clean, state) : null;
+    setSite(page && page.status === 200 ? clean : null);
   };
+
+  const page = site ? httpSite(site, state) : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -245,7 +251,7 @@ export function BrowserApp() {
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
-        {site ? (
+        {page && page.status === 200 ? (
           <div className="anim-fade-in mx-auto max-w-lg text-center">
             <div className="mb-4 flex justify-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-hz-accent/40 bg-hz-accent/10">
@@ -253,10 +259,10 @@ export function BrowserApp() {
               </div>
             </div>
             <h1 className="text-[22px] font-black tracking-tight">
-              {INTERNAL_SITES[site].title}
+              {page.title}
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-hz-text/80">
-              {INTERNAL_SITES[site].body}
+              {page.body}
             </p>
             <p className="mt-6 text-[11px] text-hz-muted">
               200 OK — {site} · {state.world.hosts["SRV-WEB"]?.os ?? "nginx"}
