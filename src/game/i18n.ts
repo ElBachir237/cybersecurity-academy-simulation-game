@@ -361,6 +361,10 @@ const fr = {
       name: "Firewall Architect",
       desc: "Concevoir une segmentation réseau correcte.",
     },
+    subnet_planner: {
+      name: "Subnet Planner",
+      desc: "Appliquer un plan d'adressage CIDR au lieu de cloner une config qui « ping ». ",
+    },
     methodical: {
       name: "Methodical",
       desc: "Terminer une mission sans erreur et sans indice.",
@@ -423,6 +427,9 @@ const fr = {
     c2_subnet_title: "Notation CIDR",
     c2_subnet_body:
       "/24 = masque 255.255.255.0. /25 divise le réseau en deux moitiés de 128 adresses. Plus le masque est long, plus le réseau est petit. Le laboratoire de calcul vous fait pratiquer le découpage.",
+    c2_plan_title: "Plan d'adressage VLAN 40",
+    c2_plan_body:
+      "Le 4e étage utilise le VLAN 40 : réseau 192.168.40.0/26, passerelle 192.168.40.1, 62 hôtes utiles, broadcast 192.168.40.63. Copier la config d'un autre VLAN (par ex. 192.168.10.0/24) « parce que ça ping » casse la segmentation.",
   },
   missions: {
     c1_lab: {
@@ -579,13 +586,113 @@ const fr = {
       title: "Calculateur de sous-réseaux",
       kind: "Laboratoire",
       brief:
-        "Le siège ouvre un nouvel étage. Avant de câbler, il faut calculer les plans d'adressage. Pratiquez le CIDR : entrez une adresse et un masque, l'outil calcule le réseau, l'adresse de broadcast et le nombre d'hôtes.",
+        "Le siège ouvre le 4e étage (VLAN 40). Avant d'y poser un poste, calculez le plan : 192.168.40.0/26. L'outil donne le réseau, le broadcast et le nombre d'hôtes utiles.",
       obj1: "Pratiquer le calcul de sous-réseaux",
-      t1: "Ouvrir le laboratoire réseau et tester 3 calculs",
-      h1: "Entrez par exemple 10.0.0.0 /26 puis observez la capacité.",
+      t1: "Ouvrir l'app Réseau (onglet CIDR)",
+      t2: "Calculer le plan VLAN 40 : 192.168.40.0 /26",
+      h1: "Cliquez l'icône Réseau, puis l'onglet CIDR.",
+      h2: "Entrez 192.168.40.0 et le masque 26, puis calculez. Vous devez voir 62 hôtes utiles.",
       method:
-        "Le calcul de sous-réseaux est une compétence de base des administrateurs réseau : il conditionne le dimensionnement et la sécurité des VLAN.",
-      next: "Le Chapitre 2 complet arrive prochainement dans l'Académie.",
+        "On dimensionne un VLAN avant de câbler : réseau, passerelle (.1), broadcast, capacité. Un masque trop large chevauche les autres étages.",
+      next: "Un vrai ticket arrive : Nour, au 4e étage, n'est pas sur le bon sous-réseau.",
+    },
+    c2_mission: {
+      title: "Nour n'est pas sur le VLAN 40",
+      kind: "Mission",
+      brief:
+        "Nour Benali (Produit) a emménagé au 4e étage. Le prestataire a cloné le netplan de WS-001 : elle est en 192.168.10.80/24. Ça « marche », mais elle n'est pas sur le plan VLAN 40 (192.168.40.0/26). Replacez PC-NOUR sur le bon sous-réseau, vérifiez, confirmez.",
+      obj1: "Lire le ticket et le plan d'adressage",
+      obj2: "Remettre PC-NOUR sur 192.168.40.24/26",
+      t1: "Lire le mail IT-2101 et le chat IT-SUPPORT",
+      t2: "Sélectionner le poste PC-NOUR dans le terminal",
+      t3: "Lire la config : 'ip addr'",
+      t4: "Vérifier le plan (app Réseau / CIDR, ou 'cat' du netplan)",
+      t5: "Corriger netplan : 192.168.40.24/26 via 192.168.40.1, puis 'sudo netplan apply'",
+      t6: "Vérifier : 'ping 192.168.40.1' puis 'ping 10.0.0.10'",
+      t7: "Confirmer le rétablissement dans IT-SUPPORT",
+      h1: "Le mail décrit le plan VLAN 40. Répondez aussi dans le chat.",
+      h2: "Sélecteur de poste en haut du terminal → PC-NOUR.",
+      h3: "Vous verrez 192.168.10.80/24 : c'est le VLAN bureaux, pas l'étage 4.",
+      h4: "Le plan est 192.168.40.0/26. Calculez-le ou lisez /etc/netplan/01-netcfg.yaml.",
+      h5: "sudo nano /etc/netplan/01-netcfg.yaml puis sudo netplan apply.",
+      h6: "La passerelle d'étage est 192.168.40.1. Le DNS reste 10.0.0.10.",
+      h7: "Un court message dans IT-SUPPORT suffit.",
+      callContext: "Nour appelle : son accès « marche un peu », mais Lena a dit VLAN 40.",
+      callQuestion: "Que lui répondez-vous ?",
+      callA: "Je compare votre adresse au plan VLAN 40 et je vous replace si besoin.",
+      callB: "Si vous pinguez l'intranet, on ne touche à rien.",
+      callC: "Mettez 192.168.40.1, c'est la première adresse du réseau.",
+      callConsequenceA: "Bonne méthode : on compare au plan, on ne se fie pas au « ça ping ».",
+      callConsequenceB: "Un ping qui passe n'a jamais prouvé qu'on est sur le bon VLAN.",
+      callConsequenceC: "192.168.40.1 est la passerelle du routeur. Un poste ne la prend jamais.",
+      decisionContext:
+        "Marc écrit : « Elle ping l'intranet. Laisse-la en 192.168.10, on n'a pas le temps. »",
+      decisionQuestion: "Que faites-vous ?",
+      decA: "Laisser PC-NOUR sur le VLAN 10, ça fonctionne",
+      decB: "Appliquer le plan : 192.168.40.24/26 via 192.168.40.1",
+      decC: "Lui donner 192.168.40.1/26 pour « être sûr »",
+      decConsequenceA:
+        "Lena ouvre IT-2102 : un poste Produit est resté sur le VLAN bureaux. La segmentation est un contrôle, pas un détail cosmétique.",
+      decConsequenceB:
+        "Choix correct : on respecte le plan d'adressage, même quand le ping « marche déjà ».",
+      decConsequenceC:
+        "Vous alliez voler l'IP de la passerelle. Collision ARP, tout l'étage 4 aurait perdu sa route.",
+      learningTitle: "« Ça ping » n'est pas un diagnostic",
+      learningImpact:
+        "PC-NOUR reste sur le VLAN 10. Le 4e étage n'est plus isolé : Nour voit les postes bureaux, pas ses imprimantes d'étage.",
+      learningWhy:
+        "Un plan d'adressage existe pour segmenter. Une config clonée d'un autre VLAN viole ce plan même si la couche 3 répond.",
+      learningCheck:
+        "Comparer ip addr au plan : réseau 192.168.40.0/26, hôte .24, passerelle .1.",
+      learningTitleGw: "Ne jamais prendre l'IP de la passerelle",
+      learningImpactGw: "192.168.40.1 appartient à RTR-HQ. Un doublon coupe la route par défaut de l'étage.",
+      learningWhyGw:
+        "Dans un /26, .0 est le réseau, .1 la passerelle, .63 le broadcast. Les hôtes prennent .2 à .62.",
+      learningCheckGw: "Vérifier le plan avant d'écrire une adresse dans netplan.",
+      method:
+        "Lire le plan → comparer ip addr → corriger le masque ET la passerelle → appliquer → ping passerelle puis DNS → confirmer.",
+      next: "La simulation du chapitre rejoue trois erreurs d'adressage courantes. Seul, sans indices.",
+      mailTicketSubject: "IT-2101 : Adressage 4e étage — PC-NOUR",
+      mailTicketBody:
+        "Nour Benali (Produit), bureau 4C. Prestataire : netplan cloné depuis WS-001. Plan obligatoire : 192.168.40.0/26, passerelle 192.168.40.1, DNS 10.0.0.10, hôte recommandé 192.168.40.24. Ne pas laisser le poste sur le VLAN 10.",
+      chatNour1: "Bonjour, j'ai Internet… mais Lena dit que je ne suis pas sur le VLAN 40 ?",
+      chatNour2: "Lena a validé : je suis bien en 192.168.40.24. Merci !",
+      chatLena1:
+        "Le plan VLAN 40 est 192.168.40.0/26. Un ping vers l'intranet ne suffit pas : elle doit être sur ce réseau.",
+      chatMarc1: "Elle ping déjà. Laisse-la en 192.168.10, on a d'autres tickets.",
+      reportSubject: "RAPPORT D'INTERVENTION — Ticket IT-2101 (PC-NOUR)",
+    },
+    c2_sim: {
+      title: "Simulation : plan d'adressage",
+      kind: "Simulation — Examen du chapitre",
+      brief:
+        "Nour rappelle : PC-NOUR n'atteint plus correctement le 4e étage. Aucun indice. Le plan reste 192.168.40.24/26 via 192.168.40.1. Diagnostiquez, corrigez, vérifiez, rapportez. L'attestation Network Foundations en dépend.",
+      obj1: "Ramener PC-NOUR sur le plan VLAN 40",
+      t1: "Prendre connaissance de l'incident (mail + chat)",
+      t2: "Diagnostiquer PC-NOUR (ip addr / ip route / ping)",
+      t3: "Corriger la cause racine (adresse, masque ou passerelle)",
+      t4: "Vérifier : ping 192.168.40.1 et ping 10.0.0.10",
+      t5: "Rédiger le rapport dans IT-SUPPORT",
+      callContext: "Nour : « Ça marchait après votre passage, là plus rien n'est cohérent. »",
+      callQuestion: "Votre réponse :",
+      callA: "Je relis le plan VLAN 40 et je compare à ip addr / ip route, sans toucher au hasard.",
+      callB: "Je remets 192.168.10.80, au moins ça pingait.",
+      callC: "Je redémarre le routeur du siège.",
+      callConsequenceA: "Méthode d'examen : plan d'abord, changement ciblé ensuite.",
+      callConsequenceB: "Revenir au VLAN 10 annule le plan d'étage.",
+      callConsequenceC: "Un reboot de RTR-HQ n'a rien à voir avec un masque ou une passerelle locale.",
+      reportSubject: "Rapport d'incident — {host}",
+      method:
+        "Comparer l'état au plan : IP dans 192.168.40.0/26, masque /26, passerelle 192.168.40.1 on-link. On ne corrige que l'écart prouvé.",
+      next: "Chapitre 2 validé. Les fondamentaux réseau tiennent : adressage, CIDR, passerelle.",
+      mailSubject: "INC-2404 : PC-NOUR hors plan VLAN 40",
+      mailBody:
+        "Régression sur PC-NOUR (4e étage). Plan : 192.168.40.24/26 via 192.168.40.1, DNS 10.0.0.10. Traitez en priorité.",
+      chatNour1: "Je n'arrive plus à joindre proprement l'étage. Vous pouvez revoir PC-NOUR ?",
+      chatNour2: "C'est bon, Lena confirme le plan. Merci.",
+      cause_mask: "masque /24 au lieu de /26 — le sous-réseau est trop large",
+      cause_gw: "passerelle 192.168.10.1, qui n'est pas on-link sur 192.168.40.0/26",
+      cause_ip: "adresse 192.168.10.80, hors du réseau 192.168.40.0/26",
     },
   },
   npc: {
@@ -599,6 +706,8 @@ const fr = {
     paulRole: "Logistique",
     soriya: "Soriya Chan",
     soriyaRole: "Analyste SOC",
+    nour: "Nour Benali",
+    nourRole: "Produit — 4e étage",
     itsd: "IT Service Desk",
     system: "Système",
   },
@@ -1023,6 +1132,10 @@ const en: Dict = {
       name: "Firewall Architect",
       desc: "Design a correct network segmentation.",
     },
+    subnet_planner: {
+      name: "Subnet Planner",
+      desc: "Apply a CIDR addressing plan instead of cloning a config that 'pings'.",
+    },
     methodical: {
       name: "Methodical",
       desc: "Finish a mission with no errors and no hints.",
@@ -1083,6 +1196,9 @@ const en: Dict = {
     c2_subnet_title: "CIDR notation",
     c2_subnet_body:
       "/24 = mask 255.255.255.0. /25 splits the network into two halves of 128 addresses. The longer the mask, the smaller the network. The calculator lab lets you practice.",
+    c2_plan_title: "VLAN 40 addressing plan",
+    c2_plan_body:
+      "Floor 4 uses VLAN 40: network 192.168.40.0/26, gateway 192.168.40.1, 62 usable hosts, broadcast 192.168.40.63. Copying another VLAN's config (e.g. 192.168.10.0/24) 'because it pings' breaks segmentation.",
   },
   missions: {
     c1_lab: {
@@ -1235,13 +1351,113 @@ const en: Dict = {
       title: "Subnet calculator",
       kind: "Lab",
       brief:
-        "HQ is opening a new floor. Before cabling, the addressing plans must be computed. Practice CIDR: enter an address and a mask, the tool computes the network, broadcast address and host count.",
+        "HQ is opening floor 4 (VLAN 40). Before placing a host, compute the plan: 192.168.40.0/26. The tool shows the network, broadcast and usable host count.",
       obj1: "Practice subnet calculation",
-      t1: "Open the network lab and run 3 calculations",
-      h1: "Try 10.0.0.0 /26 for example and observe the capacity.",
+      t1: "Open the Network app (CIDR tab)",
+      t2: "Compute the VLAN 40 plan: 192.168.40.0 /26",
+      h1: "Click the Network icon, then the CIDR tab.",
+      h2: "Enter 192.168.40.0 and mask 26, then calculate. You should see 62 usable hosts.",
       method:
-        "Subnet calculation is a core network administrator skill: it drives VLAN sizing and security.",
-      next: "Chapter 2 arrives soon in the Academy.",
+        "Size a VLAN before cabling: network, gateway (.1), broadcast, capacity. A mask that is too wide overlaps other floors.",
+      next: "A real ticket lands: Nour, on floor 4, is not on the right subnet.",
+    },
+    c2_mission: {
+      title: "Nour is not on VLAN 40",
+      kind: "Mission",
+      brief:
+        "Nour Benali (Product) moved to floor 4. The contractor cloned WS-001's netplan: she is on 192.168.10.80/24. It 'works', but she is not on the VLAN 40 plan (192.168.40.0/26). Put PC-NOUR on the right subnet, verify, confirm.",
+      obj1: "Read the ticket and the addressing plan",
+      obj2: "Move PC-NOUR to 192.168.40.24/26",
+      t1: "Read mail IT-2101 and the IT-SUPPORT chat",
+      t2: "Select host PC-NOUR in the terminal",
+      t3: "Read the config: 'ip addr'",
+      t4: "Check the plan (Network / CIDR app, or 'cat' the netplan)",
+      t5: "Fix netplan: 192.168.40.24/26 via 192.168.40.1, then 'sudo netplan apply'",
+      t6: "Verify: 'ping 192.168.40.1' then 'ping 10.0.0.10'",
+      t7: "Confirm recovery in IT-SUPPORT",
+      h1: "The mail describes the VLAN 40 plan. Reply in chat too.",
+      h2: "Host selector at the top of the terminal → PC-NOUR.",
+      h3: "You will see 192.168.10.80/24: office VLAN, not floor 4.",
+      h4: "The plan is 192.168.40.0/26. Compute it or read /etc/netplan/01-netcfg.yaml.",
+      h5: "sudo nano /etc/netplan/01-netcfg.yaml then sudo netplan apply.",
+      h6: "Floor gateway is 192.168.40.1. DNS stays 10.0.0.10.",
+      h7: "A short message in IT-SUPPORT is enough.",
+      callContext: "Nour calls: access 'kind of works', but Lena said VLAN 40.",
+      callQuestion: "What do you tell her?",
+      callA: "I'll compare your address to the VLAN 40 plan and move you if needed.",
+      callB: "If you can ping the intranet, we leave it alone.",
+      callC: "Set 192.168.40.1, that's the first address on the network.",
+      callConsequenceA: "Right method: compare to the plan, don't trust 'it pings'.",
+      callConsequenceB: "A successful ping never proved you were on the right VLAN.",
+      callConsequenceC: "192.168.40.1 is the router gateway. A workstation never takes it.",
+      decisionContext:
+        "Marc writes: 'She pings the intranet. Leave her on 192.168.10, we don't have time.'",
+      decisionQuestion: "What do you do?",
+      decA: "Leave PC-NOUR on VLAN 10, it works",
+      decB: "Apply the plan: 192.168.40.24/26 via 192.168.40.1",
+      decC: "Give her 192.168.40.1/26 to 'be sure'",
+      decConsequenceA:
+        "Lena opens IT-2102: a Product host stayed on the office VLAN. Segmentation is a control, not cosmetics.",
+      decConsequenceB:
+        "Correct: honour the addressing plan even when ping 'already works'.",
+      decConsequenceC:
+        "You were about to steal the gateway IP. ARP conflict, the whole floor would lose its default route.",
+      learningTitle: "'It pings' is not a diagnosis",
+      learningImpact:
+        "PC-NOUR stays on VLAN 10. Floor 4 is no longer isolated: Nour sees office PCs, not her floor printers.",
+      learningWhy:
+        "An addressing plan exists to segment. A cloned config from another VLAN violates that plan even if layer 3 replies.",
+      learningCheck:
+        "Compare ip addr to the plan: network 192.168.40.0/26, host .24, gateway .1.",
+      learningTitleGw: "Never take the gateway IP",
+      learningImpactGw: "192.168.40.1 belongs to RTR-HQ. A duplicate cuts the floor's default route.",
+      learningWhyGw:
+        "In a /26, .0 is the network, .1 the gateway, .63 the broadcast. Hosts take .2 through .62.",
+      learningCheckGw: "Check the plan before writing an address into netplan.",
+      method:
+        "Read the plan → compare ip addr → fix mask AND gateway → apply → ping gateway then DNS → confirm.",
+      next: "The chapter simulation replays three common addressing mistakes. Solo, no hints.",
+      mailTicketSubject: "IT-2101: Floor 4 addressing — PC-NOUR",
+      mailTicketBody:
+        "Nour Benali (Product), office 4C. Contractor cloned netplan from WS-001. Mandatory plan: 192.168.40.0/26, gateway 192.168.40.1, DNS 10.0.0.10, recommended host 192.168.40.24. Do not leave the host on VLAN 10.",
+      chatNour1: "Hi, I have Internet… but Lena says I'm not on VLAN 40?",
+      chatNour2: "Lena confirmed: I'm on 192.168.40.24. Thank you!",
+      chatLena1:
+        "VLAN 40 plan is 192.168.40.0/26. Pinging the intranet is not enough: she must be on that network.",
+      chatMarc1: "She already pings. Leave her on 192.168.10, we have other tickets.",
+      reportSubject: "INCIDENT REPORT — Ticket IT-2101 (PC-NOUR)",
+    },
+    c2_sim: {
+      title: "Simulation: addressing plan",
+      kind: "Simulation — Chapter exam",
+      brief:
+        "Nour calls back: PC-NOUR no longer reaches floor 4 correctly. No hints. The plan remains 192.168.40.24/26 via 192.168.40.1. Diagnose, fix, verify, report. The Network Foundations certificate depends on it.",
+      obj1: "Put PC-NOUR back on the VLAN 40 plan",
+      t1: "Read the incident (mail + chat)",
+      t2: "Diagnose PC-NOUR (ip addr / ip route / ping)",
+      t3: "Fix the root cause (address, mask or gateway)",
+      t4: "Verify: ping 192.168.40.1 and ping 10.0.0.10",
+      t5: "Write the report in IT-SUPPORT",
+      callContext: "Nour: 'It worked after your visit, now nothing is consistent.'",
+      callQuestion: "Your answer:",
+      callA: "I'll reread the VLAN 40 plan and compare ip addr / ip route, no random edits.",
+      callB: "I'll put 192.168.10.80 back, at least it pinged.",
+      callC: "I'll reboot the HQ router.",
+      callConsequenceA: "Exam method: plan first, targeted change second.",
+      callConsequenceB: "Going back to VLAN 10 undoes the floor plan.",
+      callConsequenceC: "Rebooting RTR-HQ has nothing to do with a local mask or gateway.",
+      reportSubject: "Incident report — {host}",
+      method:
+        "Compare state to the plan: IP in 192.168.40.0/26, mask /26, gateway 192.168.40.1 on-link. Fix only the proven gap.",
+      next: "Chapter 2 validated. Network foundations hold: addressing, CIDR, gateway.",
+      mailSubject: "INC-2404: PC-NOUR off VLAN 40 plan",
+      mailBody:
+        "Regression on PC-NOUR (floor 4). Plan: 192.168.40.24/26 via 192.168.40.1, DNS 10.0.0.10. Treat as priority.",
+      chatNour1: "I can't reach the floor properly. Can you check PC-NOUR again?",
+      chatNour2: "All good, Lena confirms the plan. Thanks.",
+      cause_mask: "mask /24 instead of /26 — the subnet is too wide",
+      cause_gw: "gateway 192.168.10.1, which is not on-link on 192.168.40.0/26",
+      cause_ip: "address 192.168.10.80, outside network 192.168.40.0/26",
     },
   },
   npc: {
@@ -1255,6 +1471,8 @@ const en: Dict = {
     paulRole: "Logistics",
     soriya: "Soriya Chan",
     soriyaRole: "SOC Analyst",
+    nour: "Nour Benali",
+    nourRole: "Product — Floor 4",
     itsd: "IT Service Desk",
     system: "System",
   },

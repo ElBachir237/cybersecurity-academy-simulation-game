@@ -13,6 +13,8 @@ import type {
   MissionRuntime,
   DebriefData,
   GameState,
+  FxApi,
+  HostRuntime,
 } from "../types";
 import { resolveName } from "../terminal";
 import type { TFn } from "../i18n";
@@ -500,6 +502,7 @@ const c1_sim: MissionDef = {
   prereq: ["c1_mission"],
   difficulty: 3,
   hasVariants: true,
+  variants: ["dns", "gw", "link"],
   estimateMin: 12,
   titleKey: "missions.c1_sim.title",
   briefKey: "missions.c1_sim.brief",
@@ -727,6 +730,68 @@ const c1_sim: MissionDef = {
   },
 };
 
+// VLAN 40 — 4th floor addressing plan used by chapter 2.
+const VLAN40 = {
+  network: "192.168.40.0",
+  cidr: 26,
+  gw: "192.168.40.1",
+  hostIp: "192.168.40.24",
+  dns: "10.0.0.10",
+} as const;
+
+function makePcNour(): HostRuntime {
+  return {
+    id: "PC-NOUR",
+    label: "PC-NOUR — Poste de Nour (4e étage)",
+    os: "Ubuntu 22.04 LTS",
+    room: "Étage 4 — Bureau 4C",
+    ifaces: {
+      eth0: {
+        state: "up",
+        dhcp: false,
+        ip: VLAN40.hostIp,
+        cidr: VLAN40.cidr,
+        gw: VLAN40.gw,
+      },
+    },
+    dns: [VLAN40.dns],
+    services: { "systemd-networkd": "active", "systemd-resolved": "active" },
+    netplanPath: "/etc/netplan/01-netcfg.yaml",
+    logs: [],
+  };
+}
+
+function ensureVlan40(fx: FxApi, state: GameState) {
+  fx.mutateHost("RTR-HQ", (h) => {
+    h.ifaces.eth4 = { state: "up", dhcp: false, ip: VLAN40.gw, cidr: VLAN40.cidr };
+  });
+  if (!state.world.hosts["PC-NOUR"]) {
+    fx.setWorld((w) => {
+      w.hosts["PC-NOUR"] = makePcNour();
+    });
+  }
+}
+
+function nourOnPlan(state: GameState): boolean {
+  const eth = state.world.hosts["PC-NOUR"]?.ifaces.eth0;
+  return eth?.ip === VLAN40.hostIp && eth.cidr === VLAN40.cidr && eth.gw === VLAN40.gw;
+}
+
+function setNourAddr(
+  fx: FxApi,
+  ip: string,
+  cidr: number,
+  gw: string,
+  log: string
+) {
+  fx.mutateHost("PC-NOUR", (h) => {
+    h.ifaces.eth0 = { state: "up", dhcp: false, ip, cidr, gw };
+    h.dns = [VLAN40.dns];
+    h.services["systemd-networkd"] = "active";
+    h.logs.push(log);
+  });
+}
+
 // ============================================================
 // CHAPTER 2 — LAB: subnet calculator (in Network app)
 // ============================================================
@@ -735,7 +800,7 @@ const c2_lab: MissionDef = {
   chapter: 2,
   kind: "lab",
   skillIds: ["ipv4", "subnetting"],
-  prereq: ["c1_lab"],
+  prereq: ["c1_sim"],
   difficulty: 1,
   hasVariants: false,
   estimateMin: 10,
@@ -759,17 +824,23 @@ const c2_lab: MissionDef = {
     {
       id: "tasks",
       type: "tasks",
-      tasks: [{ id: "t1", labelKey: "missions.c2_lab.t1", hintKey: "missions.c2_lab.h1" }],
-      handle: ({ fx, event: e, mission }) => {
+      tasks: [
+        { id: "t1", labelKey: "missions.c2_lab.t1", hintKey: "missions.c2_lab.h1" },
+        { id: "t2", labelKey: "missions.c2_lab.t2", hintKey: "missions.c2_lab.h2" },
+      ],
+      handle: ({ event: e, mission }) => {
         const done: string[] = [];
-        if (e.type === "app-opened" && e.app === "network") done.push("t1_net");
-        if (
-          e.type === "action" &&
-          e.action === "subnet-calc" &&
-          ((e.payload?.count as number) ?? 0) >= 3
-        )
-          done.push("t1");
-        const complete = done.includes("t1") || mission.tasks["t1"]?.done;
+        if (e.type === "app-opened" && e.app === "network") done.push("t1");
+        if (e.type === "action" && e.action === "subnet-calc") {
+          const count = (e.payload?.count as number) ?? 0;
+          const network = String(e.payload?.network ?? "");
+          const cidr = Number(e.payload?.cidr);
+          if (count >= 1) done.push("t1");
+          if (network === VLAN40.network && cidr === VLAN40.cidr) done.push("t2");
+        }
+        const complete =
+          (done.includes("t2") || mission.tasks["t2"]?.done) &&
+          (done.includes("t1") || mission.tasks["t1"]?.done);
         return { doneTasks: done, complete };
       },
     },
@@ -780,6 +851,14 @@ const c2_lab: MissionDef = {
         fx.awardXp(80);
         fx.skill("ipv4", "practice", 15);
         fx.skill("subnetting", "practice", 20);
+        fx.notify({
+          severity: "info",
+          source: "Academy",
+          titleKey: "notifyContent.missionReady",
+          kind: "system",
+          linkMission: "c2_mission",
+        });
+        fx.sound("unlock");
       },
     },
   ],
@@ -787,19 +866,526 @@ const c2_lab: MissionDef = {
     const score = Math.max(50, 100 - mission.errors * 12 - mission.hintsUsed * 8);
     return {
       missionId: "c2_lab",
-    titleKey: "missions.c2_lab.title",
-    outcome: "success",
-    score: 100,
-    maxScore: 100,
-    errors: [],
-    skillsValidated: [
-      { id: "ipv4", level: "practice" },
-      { id: "subnetting", level: "practice" },
-    ],
-    skillsToReview: [],
-    methodKey: "missions.c2_lab.method",
-    nextStepKey: "missions.c2_lab.next",
-    report: `${t("missions.c2_lab.title")} — ${t("common.completed")}`,
+      titleKey: "missions.c2_lab.title",
+      outcome: mission.hintsUsed > 3 ? "partial" : "success",
+      score,
+      maxScore: 100,
+      errors: [],
+      skillsValidated: [
+        { id: "ipv4", level: "practice" },
+        { id: "subnetting", level: "practice" },
+      ],
+      skillsToReview: [],
+      methodKey: "missions.c2_lab.method",
+      nextStepKey: "missions.c2_lab.next",
+      report: [
+        t("missions.c2_lab.title"),
+        "------------------------------------------------------------",
+        `Plan VLAN 40 : ${VLAN40.network}/${VLAN40.cidr}`,
+        `Passerelle : ${VLAN40.gw} | Broadcast : 192.168.40.63 | Hôtes utiles : 62`,
+        "------------------------------------------------------------",
+      ].join("\n"),
+    };
+  },
+};
+
+// ============================================================
+// CHAPTER 2 — MISSION: Nour is on the wrong subnet
+// ============================================================
+const c2_mission: MissionDef = {
+  id: "c2_mission",
+  chapter: 2,
+  kind: "mission",
+  skillIds: ["ipv4", "subnetting", "routing"],
+  prereq: ["c2_lab"],
+  difficulty: 2,
+  hasVariants: false,
+  estimateMin: 15,
+  titleKey: "missions.c2_mission.title",
+  briefKey: "missions.c2_mission.brief",
+  onStart: (fx, state) => {
+    ensureVlan40(fx, state);
+    setNourAddr(
+      fx,
+      "192.168.10.80",
+      24,
+      "192.168.10.1",
+      "Sep 12 11:18:04 pc-nour systemd-networkd: eth0: address 192.168.10.80/24 (cloned from WS-001 template)"
+    );
+    delete state.vfs["PC-NOUR"];
+    fx.setWorld((w) => {
+      w.tickets = w.tickets.filter((t) => t.id !== "IT-2101" && t.id !== "IT-2102");
+      w.tickets.push({
+        id: "IT-2101",
+        severity: "medium",
+        titleKey: "missions.c2_mission.mailTicketSubject",
+        from: "Nour Benali (Produit)",
+        status: "open",
+        createdAt: state.timeMin,
+        relatedHost: "PC-NOUR",
+      });
+    });
+  },
+  steps: [
+    {
+      id: "brief",
+      type: "brief",
+      enter: (fx) => {
+        fx.objective("missions.c2_mission.obj1");
+        fx.mail({
+          from: "itsd",
+          subjectKey: "missions.c2_mission.mailTicketSubject",
+          bodyKey: "missions.c2_mission.mailTicketBody",
+        });
+        fx.chat("itsupport", "nour", fx.t("missions.c2_mission.chatNour1"));
+        fx.chat("itsupport", "lena", fx.t("missions.c2_mission.chatLena1"));
+        fx.notify({
+          severity: "high",
+          source: "IT Service Desk",
+          titleKey: "missions.c2_mission.mailTicketSubject",
+          kind: "it",
+          linkMission: "c2_mission",
+        });
+      },
+    },
+    {
+      id: "call",
+      type: "decision",
+      decision: {
+        id: "c2m_call",
+        kind: "call",
+        speaker: "nour",
+        contextKey: "missions.c2_mission.callContext",
+        questionKey: "missions.c2_mission.callQuestion",
+        options: [
+          {
+            id: "A",
+            labelKey: "missions.c2_mission.callA",
+            correct: true,
+            consequenceKey: "missions.c2_mission.callConsequenceA",
+            whyKey: "missions.c2_mission.callConsequenceA",
+            rep: 3,
+          },
+          {
+            id: "B",
+            labelKey: "missions.c2_mission.callB",
+            consequenceKey: "missions.c2_mission.callConsequenceB",
+            whyKey: "missions.c2_mission.callConsequenceB",
+            rep: -3,
+          },
+          {
+            id: "C",
+            labelKey: "missions.c2_mission.callC",
+            consequenceKey: "missions.c2_mission.callConsequenceC",
+            whyKey: "missions.c2_mission.callConsequenceC",
+            rep: -5,
+          },
+        ],
+      },
+      enter: (fx) => {
+        fx.sound("phone");
+      },
+    },
+    {
+      id: "tasks",
+      type: "tasks",
+      objectiveKey: "missions.c2_mission.obj2",
+      tasks: [
+        { id: "t1", labelKey: "missions.c2_mission.t1", hintKey: "missions.c2_mission.h1" },
+        { id: "t2", labelKey: "missions.c2_mission.t2", hintKey: "missions.c2_mission.h2" },
+        { id: "t3", labelKey: "missions.c2_mission.t3", hintKey: "missions.c2_mission.h3" },
+        { id: "t4", labelKey: "missions.c2_mission.t4", hintKey: "missions.c2_mission.h4" },
+        { id: "t5", labelKey: "missions.c2_mission.t5", hintKey: "missions.c2_mission.h5" },
+        { id: "t6", labelKey: "missions.c2_mission.t6", hintKey: "missions.c2_mission.h6" },
+        { id: "t7", labelKey: "missions.c2_mission.t7", hintKey: "missions.c2_mission.h7" },
+      ],
+      enter: (fx) => {
+        fx.objective("missions.c2_mission.obj2");
+        fx.chat("itsupport", "marc", fx.t("missions.c2_mission.chatMarc1"));
+      },
+      handle: ({ fx, state, event: e, mission }) => {
+        const done: string[] = [];
+        if (e.type === "mail-read" || (e.type === "chat-sent" && e.channel === "itsupport"))
+          done.push("t1");
+        if (e.type === "cmd" && e.hostId === "PC-NOUR") done.push("t2");
+        if (ranOn(e, "PC-NOUR", "ip")) done.push("t3");
+        if (
+          (e.type === "app-opened" && e.app === "network") ||
+          (e.type === "action" && e.action === "subnet-calc") ||
+          (ranOn(e, "PC-NOUR", "cat") && (argAt(e, 0) ?? "").includes("netplan"))
+        )
+          done.push("t4");
+        if (nourOnPlan(state)) done.push("t5");
+        if (
+          nourOnPlan(state) &&
+          ranOn(e, "PC-NOUR", "ping") &&
+          (argAt(e, 0) === VLAN40.gw || argAt(e, 0) === VLAN40.dns)
+        )
+          done.push("t6");
+        if (
+          e.type === "chat-sent" &&
+          e.channel === "itsupport" &&
+          (mission.tasks["t6"]?.done || done.includes("t6"))
+        ) {
+          done.push("t7");
+          fx.chat("itsupport", "nour", fx.t("missions.c2_mission.chatNour2"));
+          fx.sound("success");
+        }
+        if (
+          (done.includes("t3") || mission.tasks["t3"]?.done) &&
+          !mission.decisions["c2m_leave"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c2m_leave",
+            kind: "decision",
+            contextKey: "missions.c2_mission.decisionContext",
+            questionKey: "missions.c2_mission.decisionQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c2_mission.decA",
+                consequenceKey: "missions.c2_mission.decConsequenceA",
+                whyKey: "missions.c2_mission.learningWhy",
+                rep: -6,
+                fx: (fxx, s) => {
+                  const rt = s.missions["c2_mission"];
+                  if (rt && !rt.errorKeys.includes("left_wrong_vlan")) {
+                    rt.errors += 1;
+                    rt.errorKeys.push("left_wrong_vlan");
+                  }
+                  fxx.setWorld((w) => {
+                    w.tickets.push({
+                      id: "IT-2102",
+                      severity: "high",
+                      titleKey: "missions.c2_mission.decConsequenceA",
+                      from: "Lena Kovac (IT)",
+                      status: "open",
+                      createdAt: s.timeMin,
+                      relatedHost: "PC-NOUR",
+                    });
+                  });
+                  fxx.notify({
+                    severity: "high",
+                    source: "IT",
+                    titleKey: "missions.c2_mission.decConsequenceA",
+                    kind: "it",
+                  });
+                  fxx.setLearning({
+                    titleKey: "missions.c2_mission.learningTitle",
+                    impactKey: "missions.c2_mission.learningImpact",
+                    whyKey: "missions.c2_mission.learningWhy",
+                    checkKey: "missions.c2_mission.learningCheck",
+                  });
+                  fxx.sound("alert");
+                },
+              },
+              {
+                id: "B",
+                labelKey: "missions.c2_mission.decB",
+                correct: true,
+                consequenceKey: "missions.c2_mission.decConsequenceB",
+                whyKey: "missions.c2_mission.decConsequenceB",
+                rep: 3,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c2_mission.decC",
+                consequenceKey: "missions.c2_mission.decConsequenceC",
+                whyKey: "missions.c2_mission.decConsequenceC",
+                rep: -8,
+                fx: (fxx, s) => {
+                  const rt = s.missions["c2_mission"];
+                  if (rt && !rt.errorKeys.includes("stole_gateway")) {
+                    rt.errors += 1;
+                    rt.errorKeys.push("stole_gateway");
+                  }
+                  fxx.setLearning({
+                    titleKey: "missions.c2_mission.learningTitleGw",
+                    impactKey: "missions.c2_mission.learningImpactGw",
+                    whyKey: "missions.c2_mission.learningWhyGw",
+                    checkKey: "missions.c2_mission.learningCheckGw",
+                  });
+                  fxx.sound("alert");
+                },
+              },
+            ],
+          });
+        }
+        const complete =
+          done.includes("t7") ||
+          ["t1", "t2", "t3", "t4", "t5", "t6", "t7"].every(
+            (id) => done.includes(id) || mission.tasks[id]?.done
+          );
+        return { doneTasks: done, complete };
+      },
+    },
+    {
+      id: "final",
+      type: "final",
+      enter: (fx) => {
+        fx.awardXp(160);
+        fx.awardBadge("subnet_planner");
+        fx.skill("ipv4", "competent", 25);
+        fx.skill("subnetting", "competent", 25);
+        fx.skill("routing", "learning", 15);
+        fx.notify({
+          severity: "info",
+          source: "Academy",
+          titleKey: "notifyContent.simReady",
+          kind: "system",
+          linkMission: "c2_sim",
+        });
+        fx.sound("unlock");
+      },
+    },
+  ],
+  debrief: (state, mission, t): DebriefData => {
+    const score = Math.max(50, 100 - mission.errors * 12 - mission.hintsUsed * 8);
+    const leftWrong = mission.decisions["c2m_leave"] === "A";
+    const stoleGw = mission.decisions["c2m_leave"] === "C";
+    const errors: DebriefData["errors"] = [];
+    if (leftWrong) {
+      errors.push({
+        whatKey: "missions.c2_mission.learningTitle",
+        whyKey: "missions.c2_mission.learningWhy",
+      });
+    }
+    if (stoleGw) {
+      errors.push({
+        whatKey: "missions.c2_mission.learningTitleGw",
+        whyKey: "missions.c2_mission.learningWhyGw",
+      });
+    }
+    return {
+      missionId: "c2_mission",
+      titleKey: "missions.c2_mission.title",
+      outcome: errors.length || mission.hintsUsed > 3 ? "partial" : "success",
+      score,
+      maxScore: 100,
+      errors,
+      skillsValidated: [
+        { id: "ipv4", level: "competent" },
+        { id: "subnetting", level: "competent" },
+        { id: "routing", level: "learning" },
+      ],
+      skillsToReview: errors.length ? ["subnetting"] : [],
+      methodKey: "missions.c2_mission.method",
+      nextStepKey: "missions.c2_mission.next",
+      report: [
+        t("missions.c2_mission.reportSubject"),
+        "------------------------------------------------------------",
+        `Score: ${score}/100 | Erreurs: ${mission.errors} | Indices: ${mission.hintsUsed}`,
+        "Cause racine: template WS-001 copié → 192.168.10.80/24 au lieu du plan VLAN 40.",
+        `Correction: ${VLAN40.hostIp}/${VLAN40.cidr} via ${VLAN40.gw}.`,
+        "Vérification: ping passerelle étage + DNS.",
+        "------------------------------------------------------------",
+      ].join("\n"),
+    };
+  },
+};
+
+// ============================================================
+// CHAPTER 2 — SIMULATION (exam, variants: mask | gw | ip)
+// ============================================================
+const C2_SIM_VARIANTS = ["mask", "gw", "ip"] as const;
+type C2SimVariant = (typeof C2_SIM_VARIANTS)[number];
+
+const c2_sim: MissionDef = {
+  id: "c2_sim",
+  chapter: 2,
+  kind: "simulation",
+  skillIds: ["ipv4", "subnetting", "routing", "network_diag"],
+  prereq: ["c2_mission"],
+  difficulty: 3,
+  hasVariants: true,
+  variants: ["mask", "gw", "ip"],
+  estimateMin: 12,
+  titleKey: "missions.c2_sim.title",
+  briefKey: "missions.c2_sim.brief",
+  onStart: (fx, state, variant) => {
+    const v = (
+      C2_SIM_VARIANTS.includes(variant as C2SimVariant) ? variant : "mask"
+    ) as C2SimVariant;
+    ensureVlan40(fx, state);
+    delete state.vfs["PC-NOUR"];
+    if (v === "mask") {
+      setNourAddr(
+        fx,
+        VLAN40.hostIp,
+        24,
+        VLAN40.gw,
+        "Sep 12 14:02:11 pc-nour systemd-networkd: eth0: 192.168.40.24/24 (mask too wide vs plan /26)"
+      );
+    } else if (v === "gw") {
+      setNourAddr(
+        fx,
+        VLAN40.hostIp,
+        VLAN40.cidr,
+        "192.168.10.1",
+        "Sep 12 14:02:11 pc-nour systemd-networkd: default via 192.168.10.1 (gateway not on-link)"
+      );
+    } else {
+      setNourAddr(
+        fx,
+        "192.168.10.80",
+        VLAN40.cidr,
+        VLAN40.gw,
+        "Sep 12 14:02:11 pc-nour systemd-networkd: eth0: 192.168.10.80/26 (address outside VLAN 40)"
+      );
+    }
+    fx.mail({
+      from: "itsd",
+      subjectKey: "missions.c2_sim.mailSubject",
+      bodyKey: "missions.c2_sim.mailBody",
+    });
+    fx.chat("itsupport", "nour", fx.t("missions.c2_sim.chatNour1"));
+    fx.notify({
+      severity: "critical",
+      source: "IT Service Desk",
+      titleKey: "missions.c2_sim.mailSubject",
+      kind: "it",
+      linkMission: "c2_sim",
+    });
+  },
+  steps: [
+    {
+      id: "brief",
+      type: "brief",
+      enter: (fx) => {
+        fx.objective("missions.c2_sim.obj1");
+        fx.sound("phone");
+      },
+    },
+    {
+      id: "call",
+      type: "decision",
+      decision: {
+        id: "c2s_call",
+        kind: "call",
+        speaker: "nour",
+        contextKey: "missions.c2_sim.callContext",
+        questionKey: "missions.c2_sim.callQuestion",
+        options: [
+          {
+            id: "A",
+            labelKey: "missions.c2_sim.callA",
+            correct: true,
+            consequenceKey: "missions.c2_sim.callConsequenceA",
+            whyKey: "missions.c2_sim.callConsequenceA",
+            rep: 3,
+          },
+          {
+            id: "B",
+            labelKey: "missions.c2_sim.callB",
+            consequenceKey: "missions.c2_sim.callConsequenceB",
+            whyKey: "missions.c2_sim.callConsequenceB",
+            rep: -3,
+          },
+          {
+            id: "C",
+            labelKey: "missions.c2_sim.callC",
+            consequenceKey: "missions.c2_sim.callConsequenceC",
+            whyKey: "missions.c2_sim.callConsequenceC",
+            rep: -6,
+          },
+        ],
+      },
+    },
+    {
+      id: "tasks",
+      type: "tasks",
+      objectiveKey: "missions.c2_sim.obj1",
+      tasks: [
+        { id: "t1", labelKey: "missions.c2_sim.t1" },
+        { id: "t2", labelKey: "missions.c2_sim.t2" },
+        { id: "t3", labelKey: "missions.c2_sim.t3" },
+        { id: "t4", labelKey: "missions.c2_sim.t4" },
+        { id: "t5", labelKey: "missions.c2_sim.t5" },
+      ],
+      handle: ({ fx, state, event: e, mission }) => {
+        const done: string[] = [];
+        if (e.type === "mail-read" || (e.type === "chat-sent" && e.channel === "itsupport"))
+          done.push("t1");
+        if (
+          e.type === "cmd" &&
+          e.hostId === "PC-NOUR" &&
+          (cmdIs(e, "ip") || cmdIs(e, "ping") || cmdIs(e, "cat"))
+        )
+          done.push("t2");
+        if (nourOnPlan(state)) done.push("t3");
+        if (
+          nourOnPlan(state) &&
+          ranOn(e, "PC-NOUR", "ping") &&
+          (argAt(e, 0) === VLAN40.gw || argAt(e, 0) === VLAN40.dns)
+        )
+          done.push("t4");
+        if (
+          e.type === "chat-sent" &&
+          e.channel === "itsupport" &&
+          (mission.tasks["t4"]?.done || done.includes("t4"))
+        ) {
+          done.push("t5");
+          fx.chat("itsupport", "nour", fx.t("missions.c2_sim.chatNour2"));
+          fx.sound("success");
+        }
+        const complete =
+          done.includes("t5") ||
+          ["t1", "t2", "t3", "t4", "t5"].every(
+            (id) => done.includes(id) || mission.tasks[id]?.done
+          );
+        return { doneTasks: done, complete };
+      },
+    },
+    {
+      id: "final",
+      type: "final",
+      enter: (fx, state) => {
+        const m = state.missions["c2_sim"];
+        const clean = m.errors === 0 && m.hintsUsed === 0;
+        fx.awardXp(220);
+        if (clean) fx.awardBadge("methodical");
+        fx.skill("ipv4", "competent", 30);
+        fx.skill("subnetting", "competent", 30);
+        fx.skill("routing", "practice", 20);
+        fx.skill("network_diag", "competent", 15);
+        fx.notify({
+          severity: "info",
+          source: "Academy",
+          titleKey: "notifyContent.certReady",
+          kind: "cert",
+        });
+        fx.sound("unlock");
+      },
+    },
+  ],
+  debrief: (state, mission, t): DebriefData => {
+    const v = mission.variant;
+    const score = Math.max(50, 100 - mission.errors * 12 - mission.hintsUsed * 8);
+    return {
+      missionId: "c2_sim",
+      titleKey: "missions.c2_sim.title",
+      outcome: mission.hintsUsed ? "partial" : "success",
+      score,
+      maxScore: 100,
+      errors: [],
+      skillsValidated: [
+        { id: "ipv4", level: "competent" },
+        { id: "subnetting", level: "competent" },
+        { id: "routing", level: "practice" },
+      ],
+      skillsToReview: [],
+      methodKey: "missions.c2_sim.method",
+      nextStepKey: "missions.c2_sim.next",
+      report: [
+        t("missions.c2_sim.reportSubject", { host: "PC-NOUR" }),
+        "------------------------------------------------------------",
+        `Variant: ${v}`,
+        `Score: ${score}/100`,
+        `Cause racine: ${t(`missions.c2_sim.cause_${v}`)}`,
+        `Plan: ${VLAN40.hostIp}/${VLAN40.cidr} via ${VLAN40.gw}`,
+        "------------------------------------------------------------",
+      ].join("\n"),
     };
   },
 };
@@ -810,13 +1396,22 @@ export const MISSIONS: Record<string, MissionDef> = {
   c1_mission,
   c1_sim,
   c2_lab,
+  c2_mission,
+  c2_sim,
 };
 
 export function getMission(id: string): MissionDef | undefined {
   return MISSIONS[id];
 }
 
-export const MISSION_ORDER = ["c1_lab", "c1_mission", "c1_sim", "c2_lab"];
+export const MISSION_ORDER = [
+  "c1_lab",
+  "c1_mission",
+  "c1_sim",
+  "c2_lab",
+  "c2_mission",
+  "c2_sim",
+];
 
 export function pickSimVariant(attempts: number): string {
   return SIM_VARIANTS[Math.floor(Math.random() * SIM_VARIANTS.length)];

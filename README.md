@@ -44,7 +44,7 @@ Le terminal n’est pas un décor. `ping`, `ip`, `dig` / `nslookup`, `systemctl`
 
 ## Campagne actuelle
 
-Le curriculum affiche **10 chapitres** et **17 filières** (fondamentaux, réseau, SOC, DFIR, cloud, etc.). Seul le début est jouable.
+Le curriculum affiche **10 chapitres** et **17 filières** (fondamentaux, réseau, SOC, DFIR, cloud, etc.). Les chapitres **1 et 2** sont jouables de bout en bout.
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -58,11 +58,17 @@ Boucle pédagogique complète : lab guidé → mission réelle → examen solo.
 
 Réussir le chapitre débloque le certificat **Cyber Explorer** (vérifiable via `/verify`).
 
-### Chapitre 2 — Adressage (`partial`)
+### Chapitre 2 — Fondamentaux Réseau (`released`)
+
+Boucle complète autour du **plan d’adressage VLAN 40** (`192.168.40.0/26`).
 
 | Mission | Type | Sujet |
 | --- | --- | --- |
-| **Calculateur de sous-réseaux** (`c2_lab`) | Lab | CIDR, réseau, broadcast, nombre d’hôtes |
+| **Calculateur de sous-réseaux** (`c2_lab`) | Lab | Calculer `192.168.40.0/26` dans l’app Réseau |
+| **Nour n’est pas sur le VLAN 40** (`c2_mission`) | Mission | Config clonée (`192.168.10.80/24`) vs plan d’étage |
+| **Plan d’adressage** (`c2_sim`) | Simulation (examen) | Variantes `mask` / `gw` / `ip` sur `PC-NOUR` |
+
+Réussir le chapitre débloque le certificat **Network Foundations**.
 
 ### Chapitres 3–10 (`soon`)
 
@@ -234,7 +240,7 @@ Tout nouveau contenu offensif (web, malware, purple team) reste **dans la fictio
 | --- | --- |
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
 | Moteur + terminal réseau | Solide pour le chapitre 1 |
-| Contenu jouable | Mince (4 missions) |
+| Contenu jouable | Chapitres 1 et 2 (7 missions, exams à variantes) |
 | Curriculum / skills / titres | Squelette large, peu branché |
 | SOC, certificats serveur, classe | Amorcé |
 | Auth, CI, docs produit | À faire |

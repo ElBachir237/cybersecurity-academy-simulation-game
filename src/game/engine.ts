@@ -42,7 +42,6 @@ import {
   MISSIONS,
   MISSION_ORDER,
   getMission,
-  pickSimVariant,
 } from "./data/missions";
 import { execTerminal, parseNetplan } from "./terminal";
 import {
@@ -817,9 +816,10 @@ export class GameEngine {
     for (const step of def.steps) {
       for (const t of step.tasks ?? []) rt.tasks[t.id] = { done: false };
     }
+    const pool = def.variants?.length ? def.variants : ["default"];
     rt.variant =
       forcedVariant ??
-      (def.hasVariants ? pickSimVariant(rt.attempts) : "default");
+      (def.hasVariants ? pool[Math.floor(Math.random() * pool.length)] : "default");
     rt.startedAt = Date.now();
     this.state.activeMissionId = id;
     this.state.debrief = null;
@@ -1010,6 +1010,7 @@ export class GameEngine {
 
     // Chapter progression
     if (this.state.completedMissions.includes("c1_sim")) this.state.chapter = Math.max(this.state.chapter, 2);
+    if (this.state.completedMissions.includes("c2_sim")) this.state.chapter = Math.max(this.state.chapter, 3);
 
     this.recomputeRecommendation();
     this.state.activeMissionId = null;

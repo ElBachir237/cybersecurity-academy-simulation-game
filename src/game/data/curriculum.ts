@@ -125,9 +125,9 @@ export const CHAPTERS: ChapterDef[] = [
     id: 2,
     titleKey: "chapter2",
     subKey: "chapter2",
-    status: "partial",
-    theoryKeys: ["c2_ip", "c2_subnet"],
-    missionIds: ["c2_lab"],
+    status: "released",
+    theoryKeys: ["c2_ip", "c2_subnet", "c2_plan"],
+    missionIds: ["c2_lab", "c2_mission", "c2_sim"],
   },
   { id: 3, titleKey: "Network Security", status: "soon", theoryKeys: [], missionIds: [] },
   { id: 4, titleKey: "SOC Operations", status: "soon", theoryKeys: [], missionIds: [] },
@@ -154,6 +154,7 @@ export const BADGES: BadgeDef[] = [
   { id: "incident_responder", icon: "shield", nameKey: "badges.incident_responder.name", descKey: "badges.incident_responder.desc" },
   { id: "methodical", icon: "target", nameKey: "badges.methodical.name", descKey: "badges.methodical.desc" },
   { id: "firewall_architect", icon: "brick", nameKey: "badges.firewall_architect.name", descKey: "badges.firewall_architect.desc" },
+  { id: "subnet_planner", icon: "layers", nameKey: "badges.subnet_planner.name", descKey: "badges.subnet_planner.desc" },
 ];
 
 export interface TitleDef {
@@ -192,6 +193,13 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 1",
     missionIds: ["c1_lab", "c1_mission", "c1_sim"],
     skills: ["network_basics", "dns", "dhcp", "network_diag", "terminal"],
+  },
+  {
+    id: "net_foundations",
+    titleKey: "Network Foundations",
+    level: "Chapter 2",
+    missionIds: ["c2_lab", "c2_mission", "c2_sim"],
+    skills: ["ipv4", "subnetting", "routing", "network_diag"],
   },
 ];
 

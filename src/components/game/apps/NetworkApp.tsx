@@ -51,10 +51,16 @@ export default function NetworkApp() {
     if (!result) return;
     const n = count + 1;
     setCount(n);
+    engine.dispatchAction("subnet-calc", {
+      count: n,
+      ip,
+      cidr,
+      network: result.network,
+      usable: result.usable,
+    });
     if (n >= 3 && !fired) {
       setFired(true);
       engine.openApp("network");
-      engine.dispatchAction("subnet-calc", { count: n });
     }
   };
 

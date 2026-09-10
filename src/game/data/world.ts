@@ -81,6 +81,7 @@ export function seedHosts(): Record<string, HostRuntime> {
       eth1: { state: "up", dhcp: false, ip: "192.168.20.1", cidr: 24 },
       eth2: { state: "up", dhcp: false, ip: "192.168.30.1", cidr: 24 },
       eth3: { state: "up", dhcp: false, ip: "10.0.0.1", cidr: 24 },
+      eth4: { state: "up", dhcp: false, ip: "192.168.40.1", cidr: 26 },
     },
     dns: ["10.0.0.10"],
     services: { "isc-dhcp-server": "active", "named": "active", "frr": "active" },
@@ -173,6 +174,29 @@ export function seedHosts(): Record<string, HostRuntime> {
     ],
   });
 
+  add({
+    id: "PC-NOUR",
+    label: "PC-NOUR — Poste de Nour (4e étage)",
+    os: "Ubuntu 22.04 LTS",
+    room: "Étage 4 — Bureau 4C",
+    ifaces: {
+      eth0: {
+        state: "up",
+        dhcp: false,
+        ip: "192.168.40.24",
+        cidr: 26,
+        gw: "192.168.40.1",
+      },
+    },
+    dns: ["10.0.0.10"],
+    services: { "systemd-networkd": "active", "systemd-resolved": "active" },
+    netplanPath: "/etc/netplan/01-netcfg.yaml",
+    logs: [
+      "Sep 12 11:02:01 pc-nour systemd-networkd[301]: eth0: Link UP",
+      "Sep 12 11:02:02 pc-nour systemd-networkd[301]: eth0: Gained carrier",
+    ],
+  });
+
   return hosts;
 }
 
@@ -230,6 +254,7 @@ export const NPCS: NpcDef[] = [
   { id: "marc", nameKey: "npc.marc", roleKey: "npc.marcRole", dept: "Finance" },
   { id: "paul", nameKey: "npc.paul", roleKey: "npc.paulRole", dept: "Logistique" },
   { id: "soriya", nameKey: "npc.soriya", roleKey: "npc.soriyaRole", dept: "SOC" },
+  { id: "nour", nameKey: "npc.nour", roleKey: "npc.nourRole", dept: "Produit" },
 ];
 
 // ---------------- Topology (for the Network app) ----------------
@@ -251,6 +276,7 @@ export const TOPO_NODES: TopoNode[] = [
   { id: "PC-MARIE", label: "PC-MARIE", kind: "pc", x: 400, y: 310 },
   { id: "PC-PAUL", label: "PC-PAUL", kind: "pc", x: 510, y: 310 },
   { id: "AP-01", label: "AP-01", kind: "ap", x: 620, y: 310 },
+  { id: "PC-NOUR", label: "PC-NOUR", kind: "pc", x: 700, y: 200 },
 ];
 
 export const TOPO_LINKS: [string, string][] = [
@@ -262,6 +288,7 @@ export const TOPO_LINKS: [string, string][] = [
   ["SW-01", "PC-MARIE"],
   ["SW-01", "PC-PAUL"],
   ["SW-01", "AP-01"],
+  ["SW-01", "PC-NOUR"],
 ];
 
 // ---------------- Initial content ----------------

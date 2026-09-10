@@ -294,6 +294,8 @@ export interface MissionDef {
   prereq: string[];
   difficulty: 1 | 2 | 3 | 4 | 5;
   hasVariants: boolean;
+  /** Exam variants. When hasVariants is true, one is picked at start. */
+  variants?: string[];
   estimateMin: number;
   titleKey: string;
   briefKey: string;
