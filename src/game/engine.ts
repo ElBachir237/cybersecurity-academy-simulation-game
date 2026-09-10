@@ -46,6 +46,7 @@ import {
 } from "./data/world";
 import { applyWorkshopAction, emptyWorkshop } from "./data/workshop";
 import { applySocAction, emptySocAlerts } from "./data/soc";
+import { emptyLegend } from "./data/legend";
 import {
   MISSIONS,
   MISSION_ORDER,
@@ -156,6 +157,7 @@ export function createInitialState(profile: Profile): GameState {
       socAlerts: emptySocAlerts(),
       iocs: [],
       evidence: [],
+      legend: emptyLegend(),
       tickets: [
         {
           id: "IT-1041",
@@ -292,6 +294,10 @@ export function hydrateProgression(state: GameState): GameState {
   if (completed.has("e7_sim")) chapter = Math.max(chapter, 10);
   if (completed.has("e8_sim")) chapter = Math.max(chapter, 11);
   if (completed.has("e9_sim")) chapter = Math.max(chapter, 12);
+  if (completed.has("e10_sim")) chapter = Math.max(chapter, 13);
+  if (completed.has("e11_sim")) chapter = Math.max(chapter, 14);
+  if (completed.has("e12_sim")) chapter = Math.max(chapter, 15);
+  if (completed.has("e13_sim")) chapter = Math.max(chapter, 16);
   const seededVhosts = seedVhosts();
   const vhosts = { ...seededVhosts, ...(state.world?.vhosts ?? {}) };
   const seededDir = seedDirectory();
@@ -316,6 +322,7 @@ export function hydrateProgression(state: GameState): GameState {
       socAlerts: state.world?.socAlerts ?? emptySocAlerts(),
       iocs: Array.isArray(state.world?.iocs) ? state.world.iocs : [],
       evidence: Array.isArray(state.world?.evidence) ? state.world.evidence : [],
+      legend: { ...emptyLegend(), ...(state.world?.legend ?? {}) },
     },
   };
 }
@@ -1010,6 +1017,40 @@ export class GameEngine {
       this.focusWindow("soc");
       return;
     }
+    if (def.id.startsWith("e10_")) {
+      this.openApp("browser");
+      this.openApp("terminal");
+      if (!def.id.endsWith("_lab")) this.openApp("mail");
+      this.focusWindow("terminal");
+      return;
+    }
+    if (def.id.startsWith("e11_")) {
+      this.openApp("terminal");
+      if (!def.id.endsWith("_lab")) this.openApp("mail");
+      this.focusWindow("terminal");
+      return;
+    }
+    if (def.id.startsWith("e12_")) {
+      this.openApp("network");
+      this.openApp("terminal");
+      if (!def.id.endsWith("_lab")) this.openApp("mail");
+      this.focusWindow("network");
+      return;
+    }
+    if (def.id.startsWith("e13_")) {
+      this.openApp("mail");
+      this.openApp("chat");
+      this.openApp("terminal");
+      this.focusWindow(def.id.endsWith("_lab") ? "terminal" : "mail");
+      return;
+    }
+    if (def.id.startsWith("e14_")) {
+      this.openApp("soc");
+      this.openApp("terminal");
+      if (!def.id.endsWith("_lab")) this.openApp("mail");
+      this.focusWindow("soc");
+      return;
+    }
     if (def.id === "c5_web" || def.id === "c5_sim") {
       this.openApp("mail");
       this.openApp("browser");
@@ -1227,6 +1268,10 @@ export class GameEngine {
     if (this.state.completedMissions.includes("e7_sim")) this.state.chapter = Math.max(this.state.chapter, 10);
     if (this.state.completedMissions.includes("e8_sim")) this.state.chapter = Math.max(this.state.chapter, 11);
     if (this.state.completedMissions.includes("e9_sim")) this.state.chapter = Math.max(this.state.chapter, 12);
+    if (this.state.completedMissions.includes("e10_sim")) this.state.chapter = Math.max(this.state.chapter, 13);
+    if (this.state.completedMissions.includes("e11_sim")) this.state.chapter = Math.max(this.state.chapter, 14);
+    if (this.state.completedMissions.includes("e12_sim")) this.state.chapter = Math.max(this.state.chapter, 15);
+    if (this.state.completedMissions.includes("e13_sim")) this.state.chapter = Math.max(this.state.chapter, 16);
 
     this.recomputeRecommendation();
     this.state.activeMissionId = null;

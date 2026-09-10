@@ -646,6 +646,7 @@ export const DNS_ZONE: Record<string, string> = {
   "training.horizon": "10.0.0.24",
   "dns-01.horizon.local": "10.0.0.10",
   "srv-web.horizon.local": "10.0.0.20",
+  "astral.horizon.local": "10.0.0.20",
   "srv-dc.horizon.local": "10.0.0.11",
   "comp-01.horizon.local": "10.0.0.30",
 };
@@ -668,6 +669,16 @@ export function seedVhosts(): Record<string, Vhost> {
       enabled: false,
       title: "HORIZON Lab",
       body: "Atelier architecture — palier 1. Le rack que vous avez câblé.",
+    },
+    "astral.horizon.local": {
+      serverName: "astral.horizon.local",
+      enabled: false,
+      title: "ASTRAL × HORIZON — partner portal",
+      body: "Télémétrie partenaire (simulation). Durcir avant publication.",
+      headers: false,
+      tls: false,
+      autoindex: true,
+      proxy: false,
     },
   };
 }

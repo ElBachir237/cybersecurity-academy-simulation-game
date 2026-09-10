@@ -56,6 +56,12 @@ import {
   isEvidencePath,
   paulAcquired,
 } from "./data/dfir";
+import {
+  ASTRAL_HOST,
+  GIT_SECRET_SNIPPET,
+  ensureLegend,
+  syncAstralVhost,
+} from "./data/legend";
 
 export interface TermSignals {
   cmd: string;
@@ -709,6 +715,7 @@ function cmdDns(argv: string[], host: HostRuntime, state: GameState): string[] {
 
 // ---------------- Command: curl ----------------
 function cmdCurl(argv: string[], host: HostRuntime, state: GameState, t: TFn): string[] {
+  const head = argv.includes("-I") || argv.includes("--head");
   const url = argv.find((a) => a.startsWith("http")) ?? argv.find((a) => !a.startsWith("-"));
   if (!url) return ["curl: try 'curl --help'"];
   const hostName = url.replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
@@ -727,24 +734,33 @@ function cmdCurl(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
   if (!site) {
     return [t("terminal.curlFail", { url })];
   }
-  if (site.status === 404) {
-    return [
-      `HTTP/1.1 404 Not Found`,
-      `Server: nginx/1.24.0 (simulation)`,
-      ``,
-      `<h1>404 Not Found</h1>`,
-    ];
-  }
-  return [
-    `HTTP/1.1 200 OK`,
+  const L = ensureLegend(state.world);
+  const https = url.startsWith("https://") || L.tls;
+  const status = site.status === 404 ? "404 Not Found" : "200 OK";
+  const headers = [
+    `HTTP/1.1 ${status}`,
     `Server: nginx/1.24.0 (simulation)`,
     `Content-Type: text/html`,
+  ];
+  if (L.headers) headers.push("Strict-Transport-Security: max-age=31536000; includeSubDomains");
+  if (https && L.tls) headers.push("X-Horizon-TLS: on");
+  if (L.proxy) headers.push("X-Accel-Redirect: /astral-telemetry");
+  if (L.autoindex && hostName.includes("astral")) headers.push("X-Directory-Listing: on");
+  if (head || site.status === 404) {
+    return site.status === 404
+      ? [...headers, ``, `<h1>404 Not Found</h1>`]
+      : headers;
+  }
+  const extra = L.autoindex && hostName.includes("astral") ? `<p>Index of /backup — AUTOINDEX (fermez-le)</p>` : "";
+  return [
+    ...headers,
     ``,
     `<!DOCTYPE html>`,
     `<html><head><title>${site.title}</title></head>`,
     `<body>`,
     `<h1>${site.title}</h1>`,
     `<p>${site.body}</p>`,
+    extra,
     `</body></html>`,
   ];
 }
@@ -934,6 +950,137 @@ function cmdAcquire(
   return [
     `acquire: text summary for ${id} (overscope — not the contained host)`,
     `evidence dir: ${EVIDENCE_DIR}`,
+  ];
+}
+
+function cmdNginxOps(args: string[], state: GameState, sudo: boolean, t: TFn): string[] {
+  if (args[0] === "-t") {
+    if (!sudo) return [t("terminal.permissionDenied")];
+    return [
+      "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok",
+      "nginx: configuration file /etc/nginx/nginx.conf test is successful",
+    ];
+  }
+  if (!sudo) return [t("terminal.permissionDenied")];
+  const L = ensureLegend(state.world);
+  const joined = args.map((a) => a.toLowerCase()).join(" ");
+  if (args[0] === "add_header" || joined.includes("strict-transport") || joined.includes("hsts")) {
+    L.headers = true;
+    syncAstralVhost(state.world);
+    return [`nginx: add_header Strict-Transport-Security always;  (${ASTRAL_HOST})`];
+  }
+  if (args[0] === "ssl_certificate" || args[0] === "ssl" || joined.includes("ssl_certificate")) {
+    L.tls = true;
+    syncAstralVhost(state.world);
+    return ["nginx: ssl_certificate /etc/nginx/ssl/astral.crt; ssl_certificate_key astral.key;"];
+  }
+  if (args[0] === "proxy_pass" || joined.includes("proxy_pass")) {
+    L.proxy = true;
+    syncAstralVhost(state.world);
+    return ["nginx: proxy_pass http://127.0.0.1:8080;  (ASTRAL telemetry, not public admin)"];
+  }
+  if (args[0] === "autoindex") {
+    L.autoindex = args[1] !== "off";
+    syncAstralVhost(state.world);
+    return [`nginx: autoindex ${args[1] ?? "on"};`];
+  }
+  return [
+    "nginx: usage: nginx -t",
+    "  sudo nginx add_header Strict-Transport-Security",
+    "  sudo nginx ssl_certificate /etc/nginx/ssl/astral.crt",
+    "  sudo nginx proxy_pass http://127.0.0.1:8080",
+    "  sudo nginx autoindex off",
+  ];
+}
+
+function cmdHzcloud(args: string[], state: GameState): string[] {
+  const L = ensureLegend(state.world);
+  const a0 = (args[0] ?? "help").toLowerCase();
+  const a1 = (args[1] ?? "").toLowerCase();
+  if (a0 === "sg") {
+    if (a1 === "revoke" || a1 === "delete") {
+      L.sgOpen = false;
+      return ["hzcloud: revoked 0.0.0.0/0 on sg-orbit-1 (ORBIT VPC)"];
+    }
+    return [
+      "SecurityGroup sg-orbit-1  vpc=vpc-orbit",
+      L.sgOpen ? "Ingress  tcp/443  0.0.0.0/0   << trop large" : "Ingress  tcp/443  10.0.0.0/8",
+    ];
+  }
+  if (a0 === "iam") {
+    if (a1 === "detach" || a1 === "restrict") {
+      L.iamAdmin = false;
+      return ["hzcloud: detached AdministratorAccess from intern-orbit (least privilege)"];
+    }
+    return [
+      "IAM intern-orbit",
+      L.iamAdmin ? "Attached: AdministratorAccess  << trop large" : "Attached: OrbitTelemetryRead",
+    ];
+  }
+  if (a0 === "secret" && (a1 === "rotate" || a1 === "put")) {
+    L.gitSecret = false;
+    return ["hzcloud: rotated ASTRAL_TELEMETRY_TOKEN — old git value revoked"];
+  }
+  if (a0 === "git") return cmdGit(args.slice(1), state);
+  return [
+    "hzcloud: usage:",
+    "  hzcloud sg describe | sg revoke",
+    "  hzcloud iam list | iam detach",
+    "  hzcloud secret rotate",
+  ];
+}
+
+function cmdGit(args: string[], state: GameState): string[] {
+  const L = ensureLegend(state.world);
+  const a0 = (args[0] ?? "log").toLowerCase();
+  if (a0 === "rm" || a0 === "filter") {
+    L.gitSecret = false;
+    return ["git: removed .env from orbit-ci history (simulation) — still rotate the token"];
+  }
+  if (L.gitSecret) return GIT_SECRET_SNIPPET;
+  return ["git: no live secrets in HEAD (token rotated)"];
+}
+
+function cmdArch(cmd: string, args: string[], state: GameState, sudo: boolean, t: TFn): string[] {
+  if (!sudo) return [t("terminal.permissionDenied")];
+  const L = ensureLegend(state.world);
+  const a0 = (args[0] ?? "enable").toLowerCase();
+  if (cmd === "bastion" && (a0 === "enable" || a0 === "on")) {
+    L.bastion = true;
+    return ["bastion: jump host HZ-BASTION enabled (Zero Trust path, no direct SSH to OT)"];
+  }
+  if (cmd === "ot" && (a0 === "isolate" || a0 === "enable")) {
+    L.otIsolated = true;
+    return ["ot: cameras / 10.50.0.0/24 isolated from campus (OT VLAN)"];
+  }
+  if (cmd === "zt" && (a0 === "enable" || a0 === "policy")) {
+    L.zt = true;
+    return ["zt: policy default-deny + identity-aware proxy on ASTRAL path"];
+  }
+  return [`${cmd}: usage: sudo ${cmd} enable|isolate`];
+}
+
+function cmdHzpolicy(args: string[], state: GameState): string[] {
+  const L = ensureLegend(state.world);
+  const a0 = (args[0] ?? "help").toLowerCase();
+  const a1 = (args[1] ?? "").toLowerCase();
+  if (a0 === "risk" && (a1 === "close" || a1 === "treat")) {
+    L.riskClosed = true;
+    return ["hzpolicy: risk ASTRAL-R1 closed (télémétrie exposée) — residual accepted by CISO sim"];
+  }
+  if (a0 === "sign" || (a0 === "policy" && a1 === "sign")) {
+    L.policySigned = true;
+    return ["hzpolicy: policy MANDAT-15 signed (ASTRAL partner, no rubber-stamp)"];
+  }
+  if (a0 === "supplier" && (a1 === "hold" || a1 === "block")) {
+    L.supplierHeld = true;
+    return ["hzpolicy: supplier VENDOR-X on hold pending audit"];
+  }
+  return [
+    "hzpolicy: usage:",
+    "  hzpolicy risk close ASTRAL-R1",
+    "  hzpolicy sign MANDAT-15",
+    "  hzpolicy supplier hold VENDOR-X",
   ];
 }
 
@@ -1641,6 +1788,10 @@ export function execTerminal(
       out.push("  sudo edr status|isolate|release <hôte> — containment EDR");
       out.push("  ioc list | ioc add <hash>            — watchlist SOC");
       out.push("  sudo acquire <hôte>                  — artefacts texte DFIR");
+      out.push("  sudo nginx add_header|ssl_certificate|proxy_pass|autoindex off");
+      out.push("  hzcloud sg|iam|secret                — cloud HORIZON (ORBIT)");
+      out.push("  sudo bastion enable | sudo ot isolate | sudo zt enable");
+      out.push("  hzpolicy risk|sign|supplier          — GRC MANDAT");
       out.push("  sudo nginx -t                        — tester la config nginx");
       out.push("  show vlan | show interfaces status   — ports du commutateur (SW-01)");
       out.push("  sudo switchport Gi0/14 vlan 40       — VLAN d'accès (SW-01)");
@@ -1880,13 +2031,21 @@ export function execTerminal(
       out.push(...cmdAcquire(args, host, state, sudo, t));
       break;
     case "nginx":
-      if (args[0] === "-t" || args[0] === "-t") {
-        if (!sudo) out.push(t("terminal.permissionDenied"));
-        else {
-          out.push("nginx: the configuration file /etc/nginx/nginx.conf syntax is ok");
-          out.push("nginx: configuration file /etc/nginx/nginx.conf test is successful");
-        }
-      } else out.push("nginx: usage: nginx -t");
+      out.push(...cmdNginxOps(args, state, sudo, t));
+      break;
+    case "hzcloud":
+      out.push(...cmdHzcloud(args, state));
+      break;
+    case "git":
+      out.push(...cmdGit(args, state));
+      break;
+    case "bastion":
+    case "ot":
+    case "zt":
+      out.push(...cmdArch(cmd, args, state, sudo, t));
+      break;
+    case "hzpolicy":
+      out.push(...cmdHzpolicy(args, state));
       break;
     case "ssh":
       out.push(`ssh: ${t("terminal.sshDenied")}`);

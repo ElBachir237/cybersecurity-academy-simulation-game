@@ -138,6 +138,10 @@ export interface Vhost {
   enabled: boolean;
   title: string;
   body: string;
+  headers?: boolean;
+  tls?: boolean;
+  autoindex?: boolean;
+  proxy?: boolean;
 }
 
 export interface DirectoryUser {
@@ -168,6 +172,24 @@ export interface GameWorld {
   iocs?: string[];
   /** DFIR: host ids whose text artifacts were acquired (not disk images). */
   evidence?: string[];
+  /** Legendary defensive ops (AppSec / cloud / architecture / GRC). */
+  legend?: LegendState;
+}
+
+export interface LegendState {
+  headers: boolean;
+  tls: boolean;
+  autoindex: boolean;
+  proxy: boolean;
+  sgOpen: boolean;
+  iamAdmin: boolean;
+  gitSecret: boolean;
+  bastion: boolean;
+  otIsolated: boolean;
+  zt: boolean;
+  riskClosed: boolean;
+  policySigned: boolean;
+  supplierHeld: boolean;
 }
 
 // ---------------- Mail / Chat / Notifications ----------------

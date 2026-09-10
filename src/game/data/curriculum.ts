@@ -205,7 +205,46 @@ export const CHAPTERS: ChapterDef[] = [
     theoryKeys: ["e9_chain", "e9_acquire", "e9_scope"],
     missionIds: ["e9_lab", "e9_scope", "e9_sim"],
   },
-  { id: 12, titleKey: "AppSec", status: "soon", theoryKeys: [], missionIds: [] },
+  {
+    id: 12,
+    titleKey: "chapter12",
+    subKey: "chapter12",
+    status: "released",
+    theoryKeys: ["e10_headers", "e10_tls", "e10_proxy"],
+    missionIds: ["e10_lab", "e10_web", "e10_sim"],
+  },
+  {
+    id: 13,
+    titleKey: "chapter13",
+    subKey: "chapter13",
+    status: "released",
+    theoryKeys: ["e11_sg", "e11_iam", "e11_secret"],
+    missionIds: ["e11_lab", "e11_iam", "e11_sim"],
+  },
+  {
+    id: 14,
+    titleKey: "chapter14",
+    subKey: "chapter14",
+    status: "released",
+    theoryKeys: ["e12_bastion", "e12_ot", "e12_zt"],
+    missionIds: ["e12_lab", "e12_zt", "e12_sim"],
+  },
+  {
+    id: 15,
+    titleKey: "chapter15",
+    subKey: "chapter15",
+    status: "released",
+    theoryKeys: ["e13_risk", "e13_policy", "e13_supplier"],
+    missionIds: ["e13_lab", "e13_audit", "e13_sim"],
+  },
+  {
+    id: 16,
+    titleKey: "chapter16",
+    subKey: "chapter16",
+    status: "released",
+    theoryKeys: ["e14_stack", "e14_contain", "e14_lessons"],
+    missionIds: ["e14_lab", "e14_cross", "e14_sim"],
+  },
 ];
 
 export interface BadgeDef {
@@ -232,6 +271,11 @@ export const BADGES: BadgeDef[] = [
   { id: "soc_triage", icon: "shield", nameKey: "badges.soc_triage.name", descKey: "badges.soc_triage.desc" },
   { id: "sandbox_analyst", icon: "search", nameKey: "badges.sandbox_analyst.name", descKey: "badges.sandbox_analyst.desc" },
   { id: "dfir_scribe", icon: "scroll", nameKey: "badges.dfir_scribe.name", descKey: "badges.dfir_scribe.desc" },
+  { id: "astral_vitrine", icon: "globe", nameKey: "badges.astral_vitrine.name", descKey: "badges.astral_vitrine.desc" },
+  { id: "orbit_cloud", icon: "server", nameKey: "badges.orbit_cloud.name", descKey: "badges.orbit_cloud.desc" },
+  { id: "bastion_arch", icon: "layers", nameKey: "badges.bastion_arch.name", descKey: "badges.bastion_arch.desc" },
+  { id: "mandat_grc", icon: "scroll", nameKey: "badges.mandat_grc.name", descKey: "badges.mandat_grc.desc" },
+  { id: "apogee_capstone", icon: "shield", nameKey: "badges.apogee_capstone.name", descKey: "badges.apogee_capstone.desc" },
 ];
 
 export interface TitleDef {
@@ -340,6 +384,41 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 11",
     missionIds: ["e9_lab", "e9_scope", "e9_sim"],
     skills: ["forensics", "timeline", "ioc"],
+  },
+  {
+    id: "appsec_def",
+    titleKey: "AppSec Defender",
+    level: "Chapter 12",
+    missionIds: ["e10_lab", "e10_web", "e10_sim"],
+    skills: ["web_security", "http", "api_security"],
+  },
+  {
+    id: "cloud_sec",
+    titleKey: "Cloud Security Engineer",
+    level: "Chapter 13",
+    missionIds: ["e11_lab", "e11_iam", "e11_sim"],
+    skills: ["cloud_iam", "cloud_network", "git"],
+  },
+  {
+    id: "sec_eng",
+    titleKey: "Security Engineer",
+    level: "Chapter 14",
+    missionIds: ["e12_lab", "e12_zt", "e12_sim"],
+    skills: ["seg_arch", "zero_trust", "pki"],
+  },
+  {
+    id: "grc_prac",
+    titleKey: "GRC Practitioner",
+    level: "Chapter 15",
+    missionIds: ["e13_lab", "e13_audit", "e13_sim"],
+    skills: ["risk", "audit"],
+  },
+  {
+    id: "horizon_pro",
+    titleKey: "HORIZON Professional",
+    level: "Chapter 16",
+    missionIds: ["e14_lab", "e14_cross", "e14_sim"],
+    skills: ["incident_response", "web_security", "zero_trust", "risk"],
   },
 ];
 

@@ -215,6 +215,76 @@ Commandes : `sudo acquire <hôte>` ; `cat` / `grep horiz0n` ; `sha256sum` de `pa
 
 Réussir le chapitre débloque le certificat **DFIR Analyst**.
 
+### Chapitre 12 — VITRINE / AppSec (`released`)
+
+Opération de légende **défensive** : le portail partenaire **ASTRAL** (agence spatiale **fictive** HORIZON, analogue pédagogique — pas la NASA réelle) doit sortir. Tu durcis, tu ne pentestes pas.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Opération VITRINE** (`e10_lab`) | Lab | `sudo nginx add_header` HSTS ; `sudo nginx autoindex off` ; listing = `open_dir` |
+| **TLS et proxy ASTRAL** (`e10_web`) | Mission | `ssl_certificate` + `proxy_pass 127.0.0.1:8080` + HSTS ; HTTP clair = `skip_tls` |
+| **Simulation : VITRINE** (`e10_sim`) | Simulation | Variantes `headers` / `tls` / `proxy` |
+
+Commandes : `curl -I http://astral.horizon.local` ; `sudo nginx add_header\|ssl_certificate\|proxy_pass\|autoindex off`. Rapport sur le canal **SOC**.
+
+Réussir le chapitre débloque le certificat **AppSec Defender**.
+
+### Chapitre 13 — ORBIT / Cloud HORIZON (`released`)
+
+VPC **ORBIT** : même leçon que le NAT trop large, dans le cloud **simulé** (pas AWS). IAM intern, secret Git fictif.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Opération ORBIT** (`e11_lab`) | Lab | `hzcloud sg describe` / `sg revoke` ; `0.0.0.0/0` = `leave_sg` |
+| **IAM et secret Git** (`e11_iam`) | Mission | `hzcloud iam detach` + `secret rotate` ; `git log` montre un jeton **fictif** ; recommit = `commit_secret` |
+| **Simulation : ORBIT** (`e11_sim`) | Simulation | Variantes `sg` / `iam` / `secret` |
+
+Commandes : `hzcloud sg\|iam\|secret` ; `git log`. Rapport **SOC**.
+
+Réussir le chapitre débloque le certificat **Cloud Security Engineer**.
+
+### Chapitre 14 — BASTION / Architecture (`released`)
+
+Exercice de **sécurisation** de grande ampleur (campus + OT + partenaire) : jump host, VLAN caméras `10.50.0.0/24`, Zero Trust. Tu isoles, tu n'attaques pas d'États.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Opération BASTION** (`e12_lab`) | Lab | `sudo bastion enable` + `sudo ot isolate` ; SSH direct = `flat_net` |
+| **Zero Trust ASTRAL** (`e12_zt`) | Mission | `sudo zt enable` + bastion ; OT ouvert « le temps du live » = `skip_ot` |
+| **Simulation : BASTION** (`e12_sim`) | Simulation | Variantes `bastion` / `ot` / `zt` |
+
+Commandes : `sudo bastion enable` ; `sudo ot isolate` ; `sudo zt enable`. Rapport **SOC**.
+
+Réussir le chapitre débloque le certificat **Security Engineer**.
+
+### Chapitre 15 — MANDAT / GRC (`released`)
+
+Arbitrage avec Lena : risque, politique, fournisseur. Moins de CLI, plus de décisions qui restent au dossier. Canal **IT-SUPPORT**.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Opération MANDAT** (`e13_lab`) | Lab | `hzpolicy risk close` + `hzpolicy sign` ; tampon à l'aveugle = `rubber_stamp` |
+| **Audit fournisseur** (`e13_audit`) | Mission | `hzpolicy supplier hold VENDOR-X` + signature ; calendrier magique = `ignore_audit` |
+| **Simulation : MANDAT** (`e13_sim`) | Simulation | Variantes `risk` / `policy` / `supplier` |
+
+Commandes : `hzpolicy risk close ASTRAL-R1` ; `hzpolicy sign MANDAT-15` ; `hzpolicy supplier hold VENDOR-X`. Rapport **IT-SUPPORT**.
+
+Réussir le chapitre débloque le certificat **GRC Practitioner**.
+
+### Chapitre 16 — APOGEE / Capstone (`released`)
+
+Incident transversal pendant une **fenêtre de lancement fictive ASTRAL**. Tu réutilises tout le parcours : contenir Paul, durcir la vitrine, fermer le cloud, poser le bastion / ZT, gouverner. Tu ne coupes pas le siège.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Opération APOGEE** (`e14_lab`) | Lab | `sudo edr isolate PC-PAUL` + HSTS + `autoindex off` ; tout éteindre = `cut_all` |
+| **Le siège tient** (`e14_cross`) | Mission | `hzcloud sg revoke` + `bastion enable` + `zt enable` |
+| **Simulation : APOGEE** (`e14_sim`) | Simulation | Variantes `contain` / `portal` / `govern` |
+
+Commandes : `sudo edr isolate PC-PAUL` ; `sudo nginx add_header` / `autoindex off` ; `hzcloud sg revoke` ; `sudo bastion enable` ; `sudo zt enable` ; `hzpolicy sign`. Rapport **SOC**.
+
+Réussir le chapitre débloque le certificat **HORIZON Professional**.
+
 ---
 
 ## Vision : une carrière, pas un catalogue
@@ -240,7 +310,7 @@ HORIZON CORPORATION a un **vrai parc**, enrichi chapitre après chapitre. Tu ne 
 | **PC Windows / Linux** | Postes utilisateurs | Ch. 1–4 |
 | **AP UniFi** | SSID, VLAN Wi-Fi, isolation client | Ch. 4, puis 6 |
 | **Serveurs** (`SRV-WEB`, fichiers, DNS, AD) | Services, journaux, sauvegarde | Ch. 5 |
-| **Hébergement web** | vhosts nginx/Apache, DNS interne, TLS, reverse proxy — le site s’ouvre dans **Browser** | Ch. 5 (intranet), ch. 11 (durcissement + sites publics) |
+| **Hébergement web** | vhosts nginx/Apache, DNS interne, TLS, reverse proxy — le site s'ouvre dans **Browser** | Ch. 5 (intranet), ch. 12 (VITRINE ASTRAL) |
 | **Switch d’accès** | VLAN, trunk, port security | Ch. 3, 6 |
 | **pfSense** | Pare-feu / NAT / VPN du siège (remplace progressivement le `FW-CORE` générique) | Ch. 6 |
 | **MikroTik (RouterOS)** | Routeur filiale / edge : IP, NAT, firewall, DHCP, PPPoE | Ch. 6, atelier |
@@ -265,7 +335,7 @@ Même politique, **syntaxes différentes** : un trou `0.0.0.0/0` se voit aussi b
 
 ## Parcours prévu (novice → expert)
 
-Chaque chapitre : **lab + tickets terrain + décision + examen à variantes**, certificat, skills branchées sur le moteur. Les titres ci-dessous sont le **but métier** ; l’Académie actuelle affiche encore 10 lignes « soon » — elles seront renommées / étendues au fur et à mesure.
+Chaque chapitre : **lab + tickets terrain + décision + examen à variantes**, certificat, skills branchées sur le moteur. Les titres ci-dessous sont le **but métier**.
 
 ### Chapitres 1–8 — `released` (années 0–2)
 
@@ -323,41 +393,39 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Skills :** `forensics`, `timeline`, `ioc`. Certificat : **DFIR Analyst**.
 
-### Chapitre 12 — Sécurité web & applicative (défense)
+### Chapitre 12 — VITRINE / AppSec (`released`)
 
-**But :** durcir et **exploiter** l’hébergement : vhosts, TLS, reverse proxy, perms, headers — le site public HORIZON tourne **dans** le Browser. Pas de kit d’exploitation.
+**But :** durcir l'hébergement déjà vécu : vhosts, TLS, reverse proxy, headers — le portail partenaire **ASTRAL** (fiction) tourne dans le Browser. Pas de kit d'exploitation.
 
 **Skills :** `http`, `auth`, `web_security`, `api_security`. Certificat : **AppSec Defender**.
 
-### Chapitre 13 — Cloud HORIZON & DevSecOps
+### Chapitre 13 — ORBIT / Cloud HORIZON (`released`)
 
-**But :** IAM trop large, SG `0.0.0.0/0`, secret dans Git, CI — analogue du NAT / du `/16`, dans le cloud **simulé**.
+**But :** IAM trop large, SG `0.0.0.0/0`, secret dans Git — analogue du NAT / du `/16`, dans le cloud **simulé**.
 
-**Skills :** `cloud_iam`, `cloud_network`, `git`, `sast`, `containers`. Certificat : **Cloud Security Engineer**.
+**Skills :** `cloud_iam`, `cloud_network`, `git`, `sast`. Certificat : **Cloud Security Engineer**.
 
-**Atelier architecture — palier 2 :** le siège + un VPC HORIZON, Zero Trust basique.
+### Chapitre 14 — BASTION / Ingénieur sécurité (`released`)
 
-### Chapitre 14 — Ingénieur sécurité / architecture
-
-**But :** concevoir : segmentation, IAM, défense en profondeur, Zero Trust **sur le parc déjà vécu**.
-
-**Objectif (atelier palier 3) :** une architecture **5 étoiles** — campus UniFi, edge MikroTik, pare-feu pfSense, DMZ web, OT/caméras isolées, cloud, bastion — que tu **câbles et configures** (CLI/UI de chaque marque) et que le simulateur **fait vivre** (trafic, sites hébergés, pannes, audit).
+**But :** concevoir : segmentation, bastion, OT isolé, Zero Trust **sur le parc déjà vécu**. (L'atelier 5★ câblé reste un palier suivant.)
 
 **Skills :** `seg_arch`, `zero_trust`, `iam`, `pki`. Certificat : **Security Engineer**.
 
-### Chapitre 15 — GRC & management
+### Chapitre 15 — MANDAT / GRC (`released`)
 
 **But :** risque, policy, audit, fournisseurs, arbitrage avec Marc et la direction. Moins de CLI, plus de décisions qui **restent** sur le CV du personnage.
 
 **Skills :** `risk`, `audit`. Certificat : **GRC Practitioner**.
 
-### Chapitre 16 — Capstone (architecte / CISO junior)
+### Chapitre 16 — APOGEE / Capstone (`released`)
 
-**But :** un incident qui traverse tout le parcours (réseau + AD + SOC + cloud + comms). Rapport, architecture, leçon apprise. Titre de fin : **Security Architect** / lead.
+**But :** un incident qui traverse tout le parcours (IR + AppSec + cloud + architecture + GRC). Rapport, leçon apprise. Titre de fin : **HORIZON Professional**.
+
+**Objectif :** isoler sans tout éteindre, durcir ASTRAL, fermer le SG, poser ZT, signer si la variante l'exige.
 
 **Skills :** croisées. Certificat : **HORIZON Professional**.
 
-La piste **Purple / audit interne** (équivalent pentester **côté défense**) s’ouvre après le ch. 11 : findings, pas d’armes.
+La piste **Purple / audit interne** (équivalent pentester **côté défense**) : findings, pas d'armes. Co-op et atelier 5★ restent au plan.
 
 ---
 
@@ -375,12 +443,12 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | **Fait** |
 | **E6** | Ch. 8 SOC L1 + app SOC branchée + timer | **Fait** |
 | **E7** | Co-op 2 joueurs (helpdesk + SOC) + vue formateur | Travail en équipe |
-| **E8** | Ch. 9–11 (L2, IR, DFIR) dans l’ordre | **Fait** |
-| **E9** | Ch. 11–12 (web défense, cloud HORIZON) | Ingénieur |
-| **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
-| **E11** | Ch. 14–15 GRC + capstone | Management / expert |
+| **E8** | Ch. 9–11 (L2, IR, DFIR) dans l'ordre | **Fait** |
+| **E9** | Ch. 12–13 VITRINE + ORBIT (web défense, cloud HORIZON) | **Fait** |
+| **E10** | Ch. 14 BASTION (ops) ; atelier palier 2–3 5★ | Ops **fait** ; atelier 5★ à venir |
+| **E11** | Ch. 15–16 MANDAT + capstone APOGEE | **Fait** |
 
-**Prochaine implémentation :** chapitre **12 AppSec** (défense web). Le co-op (E7) reste au plan. Pas l’atelier 5★.
+**Prochaine implémentation :** co-op (E7) et atelier 5★. La campagne solo 1–16 est jouable.
 
 ---
 
@@ -546,13 +614,13 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | Couche | Maturité |
 | --- | --- |
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
-| Moteur + terminal | Solide pour les ch. 1–11 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier, SIEM, EDR / IOC, DFIR) |
-| Contenu jouable | Chapitres 1–11 (labs + tickets + exams à variantes + atelier palier 1 + SOC L1/L2 + IR + DFIR) |
-| Curriculum carrière (ch. 12–16, AppSec, atelier 5★) | Vision écrite, pas encore jouable |
-| SOC L1–L2, IR, DFIR, certificats serveur, classe | File SIEM + sandbox/EDR + timeline jouables ; co-op à venir |
+| Moteur + terminal | Solide pour les ch. 1–16 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier, SIEM, EDR / IOC, DFIR, nginx AppSec, hzcloud, bastion/ZT, hzpolicy) |
+| Contenu jouable | Chapitres 1–16 (labs + tickets + exams à variantes + atelier palier 1 + SOC L1/L2 + IR + DFIR + VITRINE + ORBIT + BASTION + MANDAT + APOGEE) |
+| Curriculum carrière (atelier 5★, co-op) | Vision écrite, pas encore jouable |
+| SOC L1–L2, IR, DFIR, AppSec, cloud, archi, GRC, capstone, certificats serveur, classe | File SIEM + sandbox/EDR + timeline + ops légende + capstone jouables ; co-op à venir |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est un **début de carrière IT** (helpdesk → adressage → segmentation → Windows / Wi-Fi → systèmes → pfSense / MikroTik / UniFi → atelier palier 1 → **SOC L1 → SOC L2 → IR → DFIR**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (AppSec, architecture 5★). La suite utile : **chapitre 12 AppSec**.
+Le prototype est une **carrière IT** (helpdesk → … → **GRC → capstone APOGEE**), avec **SLA** et **dossier de carrière**. La suite utile : **co-op** et **atelier 5★**.
 
 ---
 

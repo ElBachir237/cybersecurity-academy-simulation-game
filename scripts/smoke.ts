@@ -757,6 +757,195 @@ function completeE9Scope(e: GameEngine) {
   e.sendChat("soc", "scope Paul only, Marie hors chaine");
 }
 
+function completeE9Sim(e: GameEngine) {
+  e.startMission("e9_sim", "auth");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e9_sim.mailSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "PC-PAUL", "grep horiz0n /var/log/syslog");
+  e.sendChat("soc", "rapport DFIR");
+}
+
+function completeChapter11Ready(): GameEngine {
+  const e = completeChapter10Ready();
+  completeE9Lab(e);
+  completeE9Scope(e);
+  completeE9Sim(e);
+  return e;
+}
+
+function mailAndCall(e: GameEngine, subjectKey: string) {
+  const mail = e.state.mails.find((m) => m.subjectKey === subjectKey)!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+}
+
+function completeE10Lab(e: GameEngine) {
+  e.startMission("e10_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+  run(e, "WS-001", "sudo nginx autoindex off");
+  e.sendChat("soc", "vitrine durcie");
+}
+
+function completeE10Web(e: GameEngine) {
+  e.startMission("e10_web");
+  mailAndCall(e, "missions.e10_web.mailSubject");
+  run(e, "WS-001", "sudo nginx ssl_certificate /etc/nginx/ssl/astral.crt");
+  run(e, "WS-001", "sudo nginx proxy_pass http://127.0.0.1:8080");
+  run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+  e.sendChat("soc", "tls proxy hsts");
+}
+
+function completeE10Sim(e: GameEngine, variant = "headers") {
+  e.startMission("e10_sim", variant);
+  mailAndCall(e, "missions.e10_sim.mailSubject");
+  if (variant === "headers") {
+    run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+    run(e, "WS-001", "sudo nginx autoindex off");
+  } else if (variant === "tls") {
+    run(e, "WS-001", "sudo nginx ssl_certificate /etc/nginx/ssl/astral.crt");
+  } else {
+    run(e, "WS-001", "sudo nginx proxy_pass http://127.0.0.1:8080");
+  }
+  e.sendChat("soc", "rapport vitrine");
+}
+
+function completeChapter12Ready(): GameEngine {
+  const e = completeChapter11Ready();
+  completeE10Lab(e);
+  completeE10Web(e);
+  completeE10Sim(e);
+  return e;
+}
+
+function completeE11Lab(e: GameEngine) {
+  e.startMission("e11_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "hzcloud sg revoke");
+  e.sendChat("soc", "sg ferme");
+}
+
+function completeE11Iam(e: GameEngine) {
+  e.startMission("e11_iam");
+  mailAndCall(e, "missions.e11_iam.mailSubject");
+  run(e, "WS-001", "hzcloud iam detach");
+  run(e, "WS-001", "hzcloud secret rotate");
+  e.sendChat("soc", "iam et secret");
+}
+
+function completeE11Sim(e: GameEngine, variant = "sg") {
+  e.startMission("e11_sim", variant);
+  mailAndCall(e, "missions.e11_sim.mailSubject");
+  if (variant === "sg") run(e, "WS-001", "hzcloud sg revoke");
+  else if (variant === "iam") run(e, "WS-001", "hzcloud iam detach");
+  else run(e, "WS-001", "hzcloud secret rotate");
+  e.sendChat("soc", "rapport orbit");
+}
+
+function completeChapter13Ready(): GameEngine {
+  const e = completeChapter12Ready();
+  completeE11Lab(e);
+  completeE11Iam(e);
+  completeE11Sim(e);
+  return e;
+}
+
+function completeE12Lab(e: GameEngine) {
+  e.startMission("e12_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo bastion enable");
+  run(e, "WS-001", "sudo ot isolate");
+  e.sendChat("soc", "bastion ot");
+}
+
+function completeE12Zt(e: GameEngine) {
+  e.startMission("e12_zt");
+  mailAndCall(e, "missions.e12_zt.mailSubject");
+  run(e, "WS-001", "sudo bastion enable");
+  run(e, "WS-001", "sudo zt enable");
+  e.sendChat("soc", "zt bastion");
+}
+
+function completeE12Sim(e: GameEngine, variant = "bastion") {
+  e.startMission("e12_sim", variant);
+  mailAndCall(e, "missions.e12_sim.mailSubject");
+  if (variant === "bastion") run(e, "WS-001", "sudo bastion enable");
+  else if (variant === "ot") run(e, "WS-001", "sudo ot isolate");
+  else run(e, "WS-001", "sudo zt enable");
+  e.sendChat("soc", "rapport bastion");
+}
+
+function completeChapter14Ready(): GameEngine {
+  const e = completeChapter13Ready();
+  completeE12Lab(e);
+  completeE12Zt(e);
+  completeE12Sim(e);
+  return e;
+}
+
+function completeE13Lab(e: GameEngine) {
+  e.startMission("e13_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "hzpolicy risk close ASTRAL-R1");
+  run(e, "WS-001", "hzpolicy sign MANDAT-15");
+  e.sendChat("itsupport", "risque clos politique signee");
+}
+
+function completeE13Audit(e: GameEngine) {
+  e.startMission("e13_audit");
+  mailAndCall(e, "missions.e13_audit.mailSubject");
+  run(e, "WS-001", "hzpolicy supplier hold VENDOR-X");
+  run(e, "WS-001", "hzpolicy sign MANDAT-15");
+  e.sendChat("itsupport", "fournisseur hold");
+}
+
+function completeE13Sim(e: GameEngine, variant = "risk") {
+  e.startMission("e13_sim", variant);
+  mailAndCall(e, "missions.e13_sim.mailSubject");
+  if (variant === "risk") run(e, "WS-001", "hzpolicy risk close ASTRAL-R1");
+  else if (variant === "policy") run(e, "WS-001", "hzpolicy sign MANDAT-15");
+  else run(e, "WS-001", "hzpolicy supplier hold VENDOR-X");
+  e.sendChat("itsupport", "rapport mandat");
+}
+
+function completeChapter15Ready(): GameEngine {
+  const e = completeChapter14Ready();
+  completeE13Lab(e);
+  completeE13Audit(e);
+  completeE13Sim(e);
+  return e;
+}
+
+function completeE14Lab(e: GameEngine) {
+  e.startMission("e14_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+  run(e, "WS-001", "sudo nginx autoindex off");
+  e.sendChat("soc", "apogee contain");
+}
+
+function completeE14Cross(e: GameEngine) {
+  e.startMission("e14_cross");
+  mailAndCall(e, "missions.e14_cross.mailSubject");
+  run(e, "WS-001", "hzcloud sg revoke");
+  run(e, "WS-001", "sudo bastion enable");
+  run(e, "WS-001", "sudo zt enable");
+  e.sendChat("soc", "sg bastion zt");
+}
+
+function completeE14Sim(e: GameEngine, variant = "contain") {
+  e.startMission("e14_sim", variant);
+  mailAndCall(e, "missions.e14_sim.mailSubject");
+  if (variant === "contain") run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  else if (variant === "portal") {
+    run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+    run(e, "WS-001", "sudo nginx autoindex off");
+  } else run(e, "WS-001", "hzpolicy sign MANDAT-15");
+  e.sendChat("soc", "rapport apogee");
+}
+
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
 {
   const e = newEngine();
@@ -2120,6 +2309,292 @@ console.log("\n[55] OLD SAVE — missing e9 runtimes still start");
   e.startMission("e9_lab");
   assert(e.state.activeMissionId === "e9_lab", "e9_lab starts from a save that lacked DFIR runtimes");
   assert(Array.isArray(e.state.world.evidence), "evidence hydrated");
+}
+
+console.log("\n[56] CHAPTER 12 LAB e10_lab — VITRINE");
+{
+  const e = completeChapter11Ready();
+  assert(e.state.missions["e10_lab"].status === "available", "e10_lab unlocked after DFIR");
+  e.startMission("e10_lab");
+  assert(e.state.activeMissionId === "e10_lab", "e10_lab starts");
+  assert(e.state.openWindows.includes("browser"), "browser workspace opened");
+  assert(e.state.openWindows.includes("terminal"), "terminal workspace opened");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+  run(e, "WS-001", "sudo nginx autoindex off");
+  const head = run(e, "WS-001", "curl -I http://astral.horizon.local").join("\n");
+  assert(head.includes("Strict-Transport-Security"), "curl -I shows HSTS");
+  e.sendChat("soc", "vitrine durcie");
+  assert(e.state.missions["e10_lab"].status === "completed", "e10_lab completed");
+  assert(e.state.badges.includes("astral_vitrine"), "VITRINE badge");
+}
+
+console.log("\n[56b] CHAPTER 12 ERROR — open_dir");
+{
+  const e = completeChapter11Ready();
+  e.startMission("e10_lab");
+  assert(e.state.pendingDecision?.id === "e10_open", "open-dir decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["e10_lab"].errorKeys.includes("open_dir"), "open_dir recorded");
+  run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+  run(e, "WS-001", "sudo nginx autoindex off");
+  e.sendChat("soc", "quand meme");
+  assert(e.state.missions["e10_lab"].status === "completed", "still completable");
+  assert(e.state.missions["e10_lab"].score < 100, "score penalized");
+}
+
+console.log("\n[57] CHAPTER 12 MISSION e10_web — mail + start");
+{
+  const e = completeChapter11Ready();
+  completeE10Lab(e);
+  e.startMission("e10_web");
+  assert(e.state.activeMissionId === "e10_web", "e10_web starts");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e10_web.mailSubject");
+  assert(!!mail, "e10_web mail delivered on start");
+  assert(e.state.openWindows.includes("mail"), "mail workspace opened");
+  e.readMail(mail!.id);
+  assert(e.state.pendingDecision?.id === "e10w_call", "tls call shown after mail-read");
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo nginx ssl_certificate /etc/nginx/ssl/astral.crt");
+  run(e, "WS-001", "sudo nginx proxy_pass http://127.0.0.1:8080");
+  run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+  e.sendChat("soc", "tls ok");
+  assert(e.state.missions["e10_web"].status === "completed", "e10_web completed");
+}
+
+for (const variant of ["headers", "tls", "proxy"] as const) {
+  console.log(`\n[58] SIM e10_sim variant=${variant}`);
+  const e = completeChapter11Ready();
+  completeE10Lab(e);
+  completeE10Web(e);
+  completeE10Sim(e, variant);
+  const s = e.state.missions["e10_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "AppSec Defender"),
+    `[${variant}] AppSec Defender certificate`
+  );
+  assert(e.state.chapter >= 13, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[59] CHAPTER 13 LAB e11_lab — ORBIT");
+{
+  const e = completeChapter12Ready();
+  e.startMission("e11_lab");
+  assert(e.state.activeMissionId === "e11_lab", "e11_lab starts");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  const desc = run(e, "WS-001", "hzcloud sg describe").join("\n");
+  assert(desc.includes("0.0.0.0/0"), "SG starts too wide");
+  run(e, "WS-001", "hzcloud sg revoke");
+  e.sendChat("soc", "sg ferme");
+  assert(e.state.missions["e11_lab"].status === "completed", "e11_lab completed");
+  assert(e.state.badges.includes("orbit_cloud"), "ORBIT badge");
+}
+
+console.log("\n[60] CHAPTER 13 MISSION e11_iam");
+{
+  const e = completeChapter12Ready();
+  completeE11Lab(e);
+  e.startMission("e11_iam");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e11_iam.mailSubject");
+  assert(!!mail, "e11_iam mail delivered");
+  e.readMail(mail!.id);
+  e.answerDecision("A");
+  const gitOut = run(e, "WS-001", "git log").join("\n");
+  assert(gitOut.includes("hz_live_not_a_real_secret"), "fictional git token shown");
+  run(e, "WS-001", "hzcloud iam detach");
+  run(e, "WS-001", "hzcloud secret rotate");
+  e.sendChat("soc", "iam secret");
+  assert(e.state.missions["e11_iam"].status === "completed", "e11_iam completed");
+}
+
+for (const variant of ["sg", "iam", "secret"] as const) {
+  console.log(`\n[61] SIM e11_sim variant=${variant}`);
+  const e = completeChapter12Ready();
+  completeE11Lab(e);
+  completeE11Iam(e);
+  completeE11Sim(e, variant);
+  const s = e.state.missions["e11_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "Cloud Security Engineer"),
+    `[${variant}] Cloud Security Engineer certificate`
+  );
+  assert(e.state.chapter >= 14, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[62] CHAPTER 14 LAB e12_lab — BASTION");
+{
+  const e = completeChapter13Ready();
+  e.startMission("e12_lab");
+  assert(e.state.openWindows.includes("network"), "network workspace opened");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo bastion enable");
+  run(e, "WS-001", "sudo ot isolate");
+  e.sendChat("soc", "bastion ot");
+  assert(e.state.missions["e12_lab"].status === "completed", "e12_lab completed");
+  assert(e.state.badges.includes("bastion_arch"), "BASTION badge");
+}
+
+console.log("\n[63] CHAPTER 14 MISSION e12_zt");
+{
+  const e = completeChapter13Ready();
+  completeE12Lab(e);
+  e.startMission("e12_zt");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e12_zt.mailSubject");
+  assert(!!mail, "e12_zt mail delivered");
+  e.readMail(mail!.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo bastion enable");
+  run(e, "WS-001", "sudo zt enable");
+  e.sendChat("soc", "zt ok");
+  assert(e.state.missions["e12_zt"].status === "completed", "e12_zt completed");
+}
+
+for (const variant of ["bastion", "ot", "zt"] as const) {
+  console.log(`\n[64] SIM e12_sim variant=${variant}`);
+  const e = completeChapter13Ready();
+  completeE12Lab(e);
+  completeE12Zt(e);
+  completeE12Sim(e, variant);
+  const s = e.state.missions["e12_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "Security Engineer"),
+    `[${variant}] Security Engineer certificate`
+  );
+  assert(e.state.chapter >= 15, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[65] CHAPTER 15 LAB e13_lab — MANDAT");
+{
+  const e = completeChapter14Ready();
+  e.startMission("e13_lab");
+  assert(e.state.openWindows.includes("mail"), "mail opened for GRC lab");
+  assert(e.state.openWindows.includes("chat"), "chat opened for GRC lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "hzpolicy risk close ASTRAL-R1");
+  run(e, "WS-001", "hzpolicy sign MANDAT-15");
+  e.sendChat("itsupport", "risque clos");
+  assert(e.state.missions["e13_lab"].status === "completed", "e13_lab completed");
+  assert(e.state.badges.includes("mandat_grc"), "MANDAT badge");
+}
+
+console.log("\n[66] CHAPTER 15 MISSION e13_audit");
+{
+  const e = completeChapter14Ready();
+  completeE13Lab(e);
+  e.startMission("e13_audit");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e13_audit.mailSubject");
+  assert(!!mail, "e13_audit mail delivered");
+  e.readMail(mail!.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "hzpolicy supplier hold VENDOR-X");
+  run(e, "WS-001", "hzpolicy sign MANDAT-15");
+  e.sendChat("itsupport", "hold ok");
+  assert(e.state.missions["e13_audit"].status === "completed", "e13_audit completed");
+}
+
+for (const variant of ["risk", "policy", "supplier"] as const) {
+  console.log(`\n[67] SIM e13_sim variant=${variant}`);
+  const e = completeChapter14Ready();
+  completeE13Lab(e);
+  completeE13Audit(e);
+  completeE13Sim(e, variant);
+  const s = e.state.missions["e13_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "GRC Practitioner"),
+    `[${variant}] GRC Practitioner certificate`
+  );
+  assert(e.state.chapter >= 16, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[68] OLD SAVE — missing e10/e13 runtimes still start");
+{
+  const e = completeChapter11Ready();
+  delete e.state.missions["e10_lab"];
+  delete e.state.missions["e10_web"];
+  delete e.state.missions["e10_sim"];
+  e.startMission("e10_lab");
+  assert(e.state.activeMissionId === "e10_lab", "e10_lab starts from a save that lacked VITRINE runtimes");
+  assert(!!e.state.world.legend, "legend hydrated");
+}
+
+console.log("\n[69] CHAPTER 16 LAB e14_lab — APOGEE");
+{
+  const e = completeChapter15Ready();
+  assert(e.state.missions["e14_lab"].status === "available", "e14_lab unlocked after GRC");
+  e.startMission("e14_lab");
+  assert(e.state.activeMissionId === "e14_lab", "e14_lab starts");
+  assert(e.state.openWindows.includes("soc"), "SOC workspace opened");
+  assert(e.state.openWindows.includes("terminal"), "terminal opened");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+  run(e, "WS-001", "sudo nginx autoindex off");
+  e.sendChat("soc", "apogee contain");
+  assert(e.state.missions["e14_lab"].status === "completed", "e14_lab completed");
+  assert(e.state.badges.includes("apogee_capstone"), "APOGEE badge");
+}
+
+console.log("\n[69b] CHAPTER 16 ERROR — cut_all");
+{
+  const e = completeChapter15Ready();
+  e.startMission("e14_lab");
+  assert(e.state.pendingDecision?.id === "e14_cut", "cut-all decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["e14_lab"].errorKeys.includes("cut_all"), "cut_all recorded");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  run(e, "WS-001", "sudo nginx add_header Strict-Transport-Security");
+  run(e, "WS-001", "sudo nginx autoindex off");
+  e.sendChat("soc", "quand meme");
+  assert(e.state.missions["e14_lab"].status === "completed", "still completable");
+  assert(e.state.missions["e14_lab"].score < 100, "score penalized");
+}
+
+console.log("\n[70] CHAPTER 16 MISSION e14_cross");
+{
+  const e = completeChapter15Ready();
+  completeE14Lab(e);
+  e.startMission("e14_cross");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e14_cross.mailSubject");
+  assert(!!mail, "e14_cross mail delivered");
+  assert(e.state.openWindows.includes("mail"), "mail workspace opened");
+  e.readMail(mail!.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "hzcloud sg revoke");
+  run(e, "WS-001", "sudo bastion enable");
+  run(e, "WS-001", "sudo zt enable");
+  e.sendChat("soc", "siege tient");
+  assert(e.state.missions["e14_cross"].status === "completed", "e14_cross completed");
+}
+
+for (const variant of ["contain", "portal", "govern"] as const) {
+  console.log(`\n[71] SIM e14_sim variant=${variant}`);
+  const e = completeChapter15Ready();
+  completeE14Lab(e);
+  completeE14Cross(e);
+  completeE14Sim(e, variant);
+  const s = e.state.missions["e14_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "HORIZON Professional"),
+    `[${variant}] HORIZON Professional certificate`
+  );
+  assert(e.state.chapter >= 16, `[${variant}] chapter stays at capstone`);
+}
+
+console.log("\n[72] OLD SAVE — missing e14 runtimes still start");
+{
+  const e = completeChapter15Ready();
+  delete e.state.missions["e14_lab"];
+  delete e.state.missions["e14_cross"];
+  delete e.state.missions["e14_sim"];
+  e.startMission("e14_lab");
+  assert(e.state.activeMissionId === "e14_lab", "e14_lab starts from a save that lacked APOGEE runtimes");
 }
 
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);
