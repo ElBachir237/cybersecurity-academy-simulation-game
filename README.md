@@ -2,7 +2,7 @@
 
 Simulation pédagogique immersive de cybersécurité.
 
-Vous n’êtes pas un joueur qui chasse un flag. Vous êtes un nouvel arrivant chez **HORIZON CORPORATION**. Dès le premier jour, vous travaillez depuis un poste d’entreprise : mail, chat, tickets, terminal Linux, carte réseau, SOC. Les pannes sont dans le monde simulé. Vos décisions ont des conséquences.
+Vous n’êtes pas un joueur qui chasse un flag. Vous êtes un **jeune pro** chez **HORIZON CORPORATION**. Vous commencez au helpdesk, vous prenez des décisions qui restent sur votre dossier, et vous pouvez, plus tard, **concevoir** le réseau que vous avez d’abord réparé. Mail, chat, tickets, terminaux (Linux, puis Windows, switch, AP), carte réseau, SOC. Les pannes sont dans le monde simulé.
 
 **Langues :** français / anglais (bascule en jeu, sans reset de partie).
 
@@ -38,13 +38,22 @@ Un bureau **HORIZON OS** avec des fenêtres, des notifications, du son, et une s
 | **Files / Tickets / Browser** | Contexte d’entreprise |
 | **Skills / Portfolio** | Compétences, badges, certificats |
 
-Le terminal n’est pas un décor. `ping`, `ip`, `dig` / `nslookup`, `systemctl`, `netplan apply`, `dhclient`, `cat` / `grep` / `nano` lisent et mutent le **même** état que la carte réseau et les missions.
+Le terminal n’est pas un décor. Les commandes **lisent et mutent le même état** que la carte réseau et les missions. Chaque famille d’équipement a **son** CLI (pas un faux langage unique) :
+
+| Famille | CLI visé (simulé, cohérent avec le monde) |
+| --- | --- |
+| Linux | `ip`, `ping`, `dig`, `systemctl`, `netplan`, `iptables`, … |
+| Windows | `ipconfig`, `ping`, `netsh`, `Get-EventLog` / PowerShell admin |
+| Switch / routeur | `show vlan`, `show ip route`, `interface` / `switchport`, ACL |
+| AP / caméra / imprimante | CLI ou UI web **d’administration** (SSID, VLAN, enregistrement) |
+
+Ce sont des commandes **d’exploitation légitime** (admin, diag, durcissement). Le jeu **n’inclura pas** Metasploit, payloads, modules d’exploit, ni procédures d’attaque copiables. La piste pentest / Red Team se joue **côté défense et audit interne** : tu vois ce qui s’est passé, tu contiens, tu corriges, tu rapportes.
 
 ---
 
 ## Campagne actuelle
 
-Le curriculum affiche **10 chapitres** et **17 filières** (fondamentaux, réseau, SOC, DFIR, cloud, etc.). Les chapitres **1, 2 et 3** sont jouables de bout en bout.
+Le curriculum **jouable** aujourd’hui : chapitres **1, 2 et 3**. La vision carrière (helpdesk → architecte / GRC) est décrite plus bas ; l’Académie in-game affiche encore l’ancienne liste 1–10 tant que les palier suivants ne sont pas codés.
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -86,9 +95,164 @@ Commandes lab : `sudo iptables -L`, `sudo iptables -D <id>`, `sudo iptables -A F
 
 Réussir le chapitre débloque le certificat **Network Sentinel**.
 
-### Chapitres 4–10 (`soon`)
+---
 
-SOC Operations, Incident Response, Web Security, DFIR, Cloud Security, DevSecOps, Threat Intelligence — **roadmap, pas encore de missions**.
+## Vision : une carrière, pas un catalogue
+
+HORIZON n’est pas une collection de labs isolés. C’est **la vie d’un jeune pro** chez HORIZON CORPORATION, du premier ticket helpdesk jusqu’à l’architecture / la gouvernance. Les chapitres se suivent comme des **années** : chaque bloc débloque des équipements, des CLI, des collègues, et des conséquences qui restent sur le personnage (réputation, erreurs, titre, dossier de carrière).
+
+Le nombre de chapitres **peut augmenter**. L’essentiel : **notions, compétences, décisions**, dans un monde qui tourne.
+
+### Règles de vie (tous les chapitres à venir)
+
+- **Contexte de chapitre** : seuls les éléments du palier sont exigés ; le siège s’enrichit, il n’est pas reset.
+- **Temps imparti** : missions et examens ont une horloge (crise, direction qui relance). Dépasser le délai = score, réputation, parfois un ticket d’escalade — comme au bureau.
+- **Dossier de carrière** : chaque décision (laisser un trou, mal rassurer Marie, isoler trop large) s’inscrit sur le personnage. Les chapitres suivants peuvent la rappeler.
+- **Équipe** (après le SOC L1) : rôles helpdesk / admin / SOC L1–L2, partie partagée, vue formateur. Pas avant d’avoir un métier solo jouable.
+- **Atelier architecture** (mode bac à sable, débloqué progressivement) : tu **dessines** le réseau d’une entreprise (VLAN, FW, AD, Wi-Fi, cloud HORIZON), tu **configures** avec les vrais CLI d’admin, tu **simules** le trafic (ping, ACL, DHCP). C’est le Packet Tracer d’HORIZON, branché sur les compétences déjà apprises — pas un second jeu déconnecté.
+
+### Ce que « vrai AD / malware / AWS / pentest » veut dire ici
+
+| Compétence visée | Dans HORIZON | Hors jeu (refusé) |
+| --- | --- | --- |
+| Active Directory | Annuaire simulé : users, OU, GPO, lockout, groupes | Installer un vrai domaine / outils d’attaque AD |
+| Malware | Sandbox SOC : hash, strings, comportement narré | Binaire exécutable, dropper, payload |
+| Cloud | Console **HORIZON Cloud** (IAM, SG, bucket) | Clone AWS et recettes d’intrusion |
+| Web | Config / session / perms sur `SRV-WEB` | PoC d’exploit, SQLi copiable |
+| Pentest | Audit interne + findings + correctifs | Metasploit, exploits, mouvement latéral « pour de vrai » |
+
+---
+
+## Parcours prévu (novice → expert)
+
+Chaque chapitre : **lab + tickets terrain + décision + examen à variantes**, certificat, skills branchées sur le moteur. Les titres ci-dessous sont le **but métier** ; l’Académie actuelle affiche encore 10 lignes « soon » — elles seront renommées / étendues au fur et à mesure.
+
+### Chapitres 1–3 — `released` (années 0–2)
+
+Helpdesk Linux, adressage, segmentation. Voir ci-dessus.
+
+**Compétences déjà en jeu :** terminal, DNS, DHCP, IPv4/CIDR, VLAN, switching d’accès, firewall FORWARD, NAT trop ouvert, diagnostic.
+
+### Chapitre 4 — Helpdesk & poste de travail (`next`)
+
+**But :** vivre le premier métier : dépanner un humain, un PC Windows, le Wi-Fi, une imprimante — avec **leurs** commandes.
+
+**Objectif :** le joueur n’est plus seulement « celui qui ping Linux ». Il installe un compte, lit `ipconfig` / `netsh`, remet un AP sur le bon SSID/VLAN, clôture un ticket dans le temps.
+
+| Mission type | Contenu |
+| --- | --- |
+| Lab | Poste Windows `PC-WIN` : `ipconfig`, ping, DNS |
+| Ticket matériel | AP / Wi-Fi : client isolé, mauvais VLAN |
+| Ticket logiciel | Compte lockout, imprimante, logiciel qui « ne lance pas » |
+| Décision | Rassurer trop vite vs diagnostiquer |
+| Exam | 3 pannes (lien / IP / Wi-Fi) |
+
+**Skills :** `windows_admin`, `wifi`, `computer_basics`, `network_diag`. Certificat visé : **Service Desk Associate**.
+
+### Chapitre 5 — Systèmes (Linux & Windows)
+
+**But :** administrer, pas seulement dépanner. Services, logs, sauvegarde, un premier **annuaire**.
+
+**Objectif :** relancer un service sans casser l’étage ; lire un journal ; créer un utilisateur dans l’AD **simulé**.
+
+**Skills :** `linux_admin`, `windows_admin`, `services`, `active_directory` (base). Certificat : **Systems Technician**.
+
+### Chapitre 6 — Admin réseau d’entreprise
+
+**But :** le quotidien admin réseau : VPN, Wi-Fi d’entreprise, DHCP multi-VLAN, supervision — CLI switch/routeur/AP complets (toujours simulés, syntaxe réelle).
+
+**Objectif :** un changement de VLAN / d’ACL tenu de bout en bout, vérifié par ping et par un collègue.
+
+**Skills :** `routing`, `switching`, `vlan`, `firewall`, `wifi`. Certificat : **Network Administrator**.
+
+**Atelier architecture — palier 1 :** tu poses toi-même VLAN + GW + FW d’un petit siège (5–20 hôtes) et tu dois faire passer le plan d’adressage + la segmentation du ch. 3.
+
+### Chapitre 7 — SOC L1
+
+**But :** porte d’entrée cyber. File d’alertes, SIEM, phishing, faux positif, escalation **dans le temps imparti**.
+
+**Objectif :** trier 10 alertes, n’en escalader qu’une vraie, sans noyer Soriya.
+
+**Skills :** `alert_triage`, `siem`, `log_analysis`. Certificat : **SOC Analyst L1**. L’app SOC se remplit pour de vrai. **Co-op** possible (helpdesk + L1).
+
+### Chapitre 8 — Analyste / SOC L2
+
+**But :** plus d’autonomie : endpoint (EDR **simulé**), hunting léger, malware en **sandbox** (pas d’exécutable).
+
+**Skills :** `log_analysis`, `malware_triage`, `ioc`, `threat_hunting`. Certificat : **Security Analyst**.
+
+### Chapitre 9 — Réponse à incident
+
+**But :** contenir, communiquer, timeline — sous pression (timer, direction).
+
+**Objectif :** isoler sans tuer la paie ; un mauvais containment laisse une trace au dossier.
+
+**Skills :** `incident_response`, `defense_depth`. Certificat : **Incident Responder**.
+
+### Chapitre 10 — DFIR
+
+**But :** preuve et récit. Comment est-il entré, qu’a-t-il touché, quoi extraire — artefacts **dans** HORIZON.
+
+**Skills :** `forensics`, `timeline`, `ioc`. Certificat : **DFIR Analyst**.
+
+### Chapitre 11 — Sécurité web & applicative (défense)
+
+**But :** durcir `SRV-WEB` (auth, session, perms, headers). Pas de kit d’exploitation.
+
+**Skills :** `http`, `auth`, `web_security`, `api_security`. Certificat : **AppSec Defender**.
+
+### Chapitre 12 — Cloud HORIZON & DevSecOps
+
+**But :** IAM trop large, SG `0.0.0.0/0`, secret dans Git, CI — analogue du NAT / du `/16`, dans le cloud **simulé**.
+
+**Skills :** `cloud_iam`, `cloud_network`, `git`, `sast`, `containers`. Certificat : **Cloud Security Engineer**.
+
+**Atelier architecture — palier 2 :** le siège + un VPC HORIZON, Zero Trust basique.
+
+### Chapitre 13 — Ingénieur sécurité / architecture
+
+**But :** concevoir : segmentation, IAM, défense en profondeur, Zero Trust **sur le parc déjà vécu**.
+
+**Objectif (atelier palier 3) :** une architecture **5 étoiles** (campus, DMZ, OT/caméras en VLAN isolé, cloud, bastion) que tu configures toi-même et que le simulateur **fait vivre** (trafic, pannes, audit).
+
+**Skills :** `seg_arch`, `zero_trust`, `iam`, `pki`. Certificat : **Security Engineer**.
+
+### Chapitre 14 — GRC & management
+
+**But :** risque, policy, audit, fournisseurs, arbitrage avec Marc et la direction. Moins de CLI, plus de décisions qui **restent** sur le CV du personnage.
+
+**Skills :** `risk`, `audit`. Certificat : **GRC Practitioner**.
+
+### Chapitre 15 — Capstone (architecte / CISO junior)
+
+**But :** un incident qui traverse tout le parcours (réseau + AD + SOC + cloud + comms). Rapport, architecture, leçon apprise. Titre de fin : **Security Architect** / lead.
+
+**Skills :** croisées. Certificat : **HORIZON Professional**.
+
+La piste **Purple / audit interne** (équivalent pentester **côté défense**) s’ouvre après le ch. 11 : findings, pas d’armes.
+
+---
+
+## Plan de travail (étape par étape)
+
+On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke + README + push GitHub — comme les ch. 1–3.
+
+| Étape | Livrable | Débloque |
+| --- | --- | --- |
+| **E0** | Ce document de vision (ce commit) | Alignement produit |
+| **E1** | Ch. 4 Helpdesk : Windows + `ipconfig`/`netsh` + Wi-Fi/AP | Métier junior, plus seulement Linux |
+| **E2** | Horloge de mission + dossier de carrière (décisions persistantes) | Pression « monde réel » |
+| **E3** | Ch. 5 Systèmes + AD simulé (users/OU/GPO, pas un vrai DC attaquable) | Admin |
+| **E4** | Ch. 6 Admin réseau + CLI switch/routeur/AP enrichi | Quotidien réseau |
+| **E5** | **Atelier architecture palier 1** (éditeur de topologie + simu ping/ACL) | « Je construis le siège » |
+| **E6** | Ch. 7 SOC L1 + app SOC branchée + timer | Porte d’entrée cyber |
+| **E7** | Co-op 2 joueurs (helpdesk + SOC) + vue formateur | Travail en équipe |
+| **E8** | Ch. 8–10 (L2, IR, DFIR) dans l’ordre | Analyste → DFIR |
+| **E9** | Ch. 11–12 (web défense, cloud HORIZON) | Ingénieur |
+| **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
+| **E11** | Ch. 14–15 GRC + capstone | Management / expert |
+
+**Prochaine implémentation :** étape **E1** (chapitre 4 helpdesk Windows / Wi-Fi), pas le SOC, pas l’atelier 5★. L’atelier sans les compétences 4–6 serait un dessin, pas une carrière.
 
 ---
 
@@ -174,7 +338,7 @@ npx playwright test
 3. **Simulation / examen** — seul, variantes, peu d’indices.
 4. **Debrief** — score, erreurs, compétences validées, suite recommandée.
 
-Ce que le projet **ne** veut pas devenir : un QCM déguisé, un CTF de flags, ou un simulateur d’exploits réels.
+Ce que le projet **ne** veut pas devenir : un QCM déguisé, un CTF de flags, ou un simulateur d’exploits réels (Metasploit, payloads, PoC). Il veut devenir **une carrière simulée** : helpdesk → admin → SOC → IR/DFIR → ingénieur → architecte / GRC, avec de vrais CLI d’admin et un atelier d’architecture.
 
 ---
 
@@ -186,12 +350,10 @@ Classées par priorité produit. Le moteur et le desktop sont déjà trop en ava
 
 C’est le vrai chantier. Sans ça, HORIZON reste une démo du premier jour.
 
-- **Chapitre 4 — SOC** : file d’alertes, faux positifs, escalation, playbooks. L’app SOC existe déjà, elle est quasi vide.
-- **Chapitre 5 — Incident Response** : containment, communication, timeline, leçons apprises.
-- **Chapitres 6–10** dans l’ordre : Web, DFIR, Cloud, DevSecOps, Threat Intel — **une boucle lab → mission → exam par chapitre**, pas un catalogue de compétences orphelines.
-- Plus de **variantes** d’examens (comme `c1_sim`) pour empêcher le par cœur.
+- **Étapes E1 → E11** du plan ci-dessus (helpdesk Windows d’abord, puis systèmes, réseau, atelier, SOC, équipe, etc.).
+- Plus de **variantes** d’examens pour empêcher le par cœur.
 - Scénarios **phishing / social engineering** dans Mail + Chat (déjà prévu dans le modèle de données).
-- Attestations au-delà de Cyber Explorer (un certificat par chapitre, puis un parcours métier).
+- Un certificat **par palier de carrière**, puis le capstone HORIZON Professional.
 
 ### 2. Auteur de contenu
 
@@ -204,12 +366,12 @@ Aujourd’hui une mission = TypeScript + closures. Un formateur ne peut pas écr
 
 ### 3. Monde simulé plus riche
 
-- Hôtes **Windows** (aujourd’hui le parc est surtout Ubuntu / Debian).
-- Active Directory, IAM, certificats PKI — les skills existent, le monde non.
+- Hôtes **Windows** et CLI `ipconfig` / `netsh` (chapitre 4).
+- Active Directory **simulé**, IAM, certificats PKI — les skills existent, le monde non encore.
 - SIEM plus crédible : corrélation, fenêtres de logs, fausse piste.
 - Pannes **multi-hôtes** (un DHCP down qui casse un étage, pas un PC).
-- Carte réseau interactive : cliquer un hôte ouvre le bon terminal / les bons logs.
-- Mode **crise** déjà esquissé dans l’audio (`tense` / `crisis`) : l’utiliser vraiment (timer, direction qui appelle, tickets qui s’empilent).
+- **Atelier architecture** : cliquer, câbler, configurer, simuler.
+- Mode **crise** (`tense` / `crisis`) : timer, direction qui appelle, tickets qui s’empilent.
 
 ### 4. Produit & classe
 
@@ -241,11 +403,11 @@ Aujourd’hui une mission = TypeScript + closures. Un formateur ne peut pas écr
 
 ### 7. Ligne rouge pédagogique
 
-Tout nouveau contenu offensif (web, malware, purple team) reste **dans la fiction HORIZON** :
+Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la fiction HORIZON** et **côté défense / audit** :
 
-- pas d’exploits reproductibles sur des cibles réelles ;
-- pas de payloads, PoC ou procédures d’attaque copiables hors simu ;
-- l’objectif reste diagnostiquer, contenir, expliquer — pas « casser pour le fun ».
+- pas d’exploits reproductibles, pas de Metasploit, pas de payloads, pas de PoC copiables hors simu ;
+- pas de maliciel exécutable ;
+- l’objectif reste diagnostiquer, contenir, concevoir, expliquer — pas « casser pour le fun ».
 
 ---
 
@@ -254,13 +416,13 @@ Tout nouveau contenu offensif (web, malware, purple team) reste **dans la fictio
 | Couche | Maturité |
 | --- | --- |
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
-| Moteur + terminal réseau | Solide pour le chapitre 1 |
-| Contenu jouable | Chapitres 1 et 2 (7 missions, exams à variantes) |
-| Curriculum / skills / titres | Squelette large, peu branché |
+| Moteur + terminal réseau | Solide pour les chapitres 1–3 (Linux, VLAN, FW, switch) |
+| Contenu jouable | Chapitres 1–3 (lab + tickets + exams à variantes, ch. 3 = 5 missions) |
+| Curriculum carrière (ch. 4–15, atelier, timer, co-op) | Vision écrite, pas encore jouable |
 | SOC, certificats serveur, classe | Amorcé |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est convaincant comme **premier jour IT / réseau**. Ce n’est pas encore une académie complète. La suite utile n’est pas « plus d’UI », c’est **plus de missions de qualité** et un format de contenu tenable.
+Le prototype est convaincant comme **début de carrière IT / réseau** (helpdesk Linux → adressage → segmentation). Ce n’est pas encore l’académie complète (Windows, AD, SOC, architecture 5★, équipe). La suite utile n’est pas « plus d’UI », c’est **le palier suivant du métier** (étape E1).
 
 ---
 
