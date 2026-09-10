@@ -165,10 +165,18 @@ export const CHAPTERS: ChapterDef[] = [
     theoryKeys: ["c6_pf", "c6_mt", "c6_unifi"],
     missionIds: ["c6_lab", "c6_mt", "c6_unifi", "c6_sim"],
   },
-  { id: 7, titleKey: "SOC L1", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 8, titleKey: "SOC L2", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 9, titleKey: "Incident Response", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 10, titleKey: "DFIR", status: "soon", theoryKeys: [], missionIds: [] },
+  {
+    id: 7,
+    titleKey: "chapter7",
+    subKey: "chapter7",
+    status: "released",
+    theoryKeys: ["e5_place", "e5_addr", "e5_site"],
+    missionIds: ["e5_lab", "e5_site", "e5_sim"],
+  },
+  { id: 8, titleKey: "SOC L1", status: "soon", theoryKeys: [], missionIds: [] },
+  { id: 9, titleKey: "SOC L2", status: "soon", theoryKeys: [], missionIds: [] },
+  { id: 10, titleKey: "Incident Response", status: "soon", theoryKeys: [], missionIds: [] },
+  { id: 11, titleKey: "DFIR", status: "soon", theoryKeys: [], missionIds: [] },
 ];
 
 export interface BadgeDef {
@@ -191,6 +199,7 @@ export const BADGES: BadgeDef[] = [
   { id: "web_host", icon: "globe", nameKey: "badges.web_host.name", descKey: "badges.web_host.desc" },
   { id: "directory_clerk", icon: "users", nameKey: "badges.directory_clerk.name", descKey: "badges.directory_clerk.desc" },
   { id: "vendor_net", icon: "server", nameKey: "badges.vendor_net.name", descKey: "badges.vendor_net.desc" },
+  { id: "rack_builder", icon: "layers", nameKey: "badges.rack_builder.name", descKey: "badges.rack_builder.desc" },
 ];
 
 export interface TitleDef {
@@ -264,6 +273,13 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 6",
     missionIds: ["c6_lab", "c6_mt", "c6_unifi", "c6_sim"],
     skills: ["pfsense", "mikrotik", "unifi", "firewall"],
+  },
+  {
+    id: "lab_arch",
+    titleKey: "Junior Architect",
+    level: "Chapter 7",
+    missionIds: ["e5_lab", "e5_site", "e5_sim"],
+    skills: ["seg_arch", "pfsense", "web_hosting"],
   },
 ];
 

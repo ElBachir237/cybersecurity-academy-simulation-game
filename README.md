@@ -58,7 +58,7 @@ Ce sont des commandes **d’exploitation légitime** (admin, diag, durcissement)
 
 ## Campagne actuelle
 
-Le curriculum **jouable** aujourd’hui : chapitres **1 à 6**. La vision carrière (atelier architecture → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 7–10 en « à venir ».
+Le curriculum **jouable** aujourd’hui : chapitres **1 à 7**. La vision carrière (SOC → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 8–11 en « à venir ».
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -145,6 +145,20 @@ Commandes : `pfctl -sr\|-sn\|-s interfaces`, `easyrule delete wan <id>`, `/ip ad
 
 Réussir le chapitre débloque le certificat **Network Administrator**.
 
+### Chapitre 7 — Atelier architecture palier 1 (`released`)
+
+Rack isolé (`LAB-*`), pas le siège. App **Réseau → Atelier** : on **place** pfSense / switch / serveur / PC / AP, on **câble** via le switch, on **adresse** `10.20.0.0/24`, on **publie** `lab.horizon.local` (curl depuis `LAB-PC`).
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Le rack vide** (`e5_lab`) | Lab | Placer 5 boîtes, câbler en étoile sur `LAB-SW` ; skip switch = erreur |
+| **lab.horizon.local** (`e5_site`) | Mission | `ifconfig em1 10.20.0.1/24`, `ip addr add`, `nsupdate` + vhost ; skip DNS = erreur |
+| **Simulation : atelier** (`e5_sim`) | Simulation | Variantes `cable` / `addr` / `nginx` |
+
+Commandes : boutons palette + Câbler ; `ifconfig em1 <ip>/<cidr>` (pfSense) ; `ip addr add <ip>/<cidr> dev eth0` ; `sudo nsupdate add lab.horizon.local A 10.20.0.20` (LAB-WEB) ; `sudo ln -s` du vhost ; `curl lab.horizon.local` depuis LAB-PC.
+
+Réussir le chapitre débloque le certificat **Junior Architect**.
+
 ---
 
 ## Vision : une carrière, pas un catalogue
@@ -197,7 +211,7 @@ Même politique, **syntaxes différentes** : un trou `0.0.0.0/0` se voit aussi b
 
 Chaque chapitre : **lab + tickets terrain + décision + examen à variantes**, certificat, skills branchées sur le moteur. Les titres ci-dessous sont le **but métier** ; l’Académie actuelle affiche encore 10 lignes « soon » — elles seront renommées / étendues au fur et à mesure.
 
-### Chapitres 1–6 — `released` (années 0–2)
+### Chapitres 1–7 — `released` (années 0–2)
 
 Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / nginx / AD simulé, **puis pfSense / MikroTik / passerelle UniFi**. Voir ci-dessus.
 
@@ -219,9 +233,11 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Skills :** `routing`, `firewall`, `wifi`, `mikrotik`, `pfsense`, `unifi`. Certificat : **Network Administrator**.
 
-**Atelier architecture — palier 1 (E5, pas encore jouable) :** tu **places** toi-même un pfSense (ou un MikroTik), un switch, un AP UniFi, un `SRV-WEB` ; tu câbles ; tu dois faire passer adressage + segmentation + **un site intranet joignable**.
+**Atelier architecture — palier 1 (`released`) :** tu **places** un pfSense, un switch, un AP UniFi, un serveur web, un PC de test ; tu câbles via le switch ; tu adresses `10.20.0.0/24` ; `lab.horizon.local` répond au curl.
 
 ### Chapitre 7 — SOC L1
+
+*(Dans l’Académie, le palier 7 jouable est l’atelier ; le SOC L1 reste le prochain métier, affiché en « à venir ».)*
 
 **But :** porte d’entrée cyber. File d’alertes, SIEM, phishing, faux positif, escalation **dans le temps imparti**.
 
@@ -298,7 +314,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E2** | Horloge de mission + dossier de carrière (décisions persistantes) | **Fait** |
 | **E3** | Ch. 5 Systèmes + AD simulé + **hébergement** (vhost nginx, site visible dans Browser) | **Fait** |
 | **E4** | Ch. 6 : **pfSense + MikroTik RouterOS + passerelle UniFi** (plus le FW générique seul) | **Fait** |
-| **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | « Je construis le siège » |
+| **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | **Fait** |
 | **E6** | Ch. 7 SOC L1 + app SOC branchée + timer | Porte d’entrée cyber |
 | **E7** | Co-op 2 joueurs (helpdesk + SOC) + vue formateur | Travail en équipe |
 | **E8** | Ch. 8–10 (L2, IR, DFIR) dans l’ordre | Analyste → DFIR |
@@ -306,7 +322,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
 | **E11** | Ch. 14–15 GRC + capstone | Management / expert |
 
-**Prochaine implémentation :** étape **E5** (atelier architecture palier 1 : poser / câbler / configurer). Pas le SOC.
+**Prochaine implémentation :** étape **E6** (ch. 8 SOC L1). Pas l’atelier 5★.
 
 ---
 
@@ -472,13 +488,13 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | Couche | Maturité |
 | --- | --- |
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
-| Moteur + terminal | Solide pour les ch. 1–6 (Linux, Windows, VLAN, FW, switch, UniFi AP/GW, pfSense, RouterOS) |
-| Contenu jouable | Chapitres 1–6 (labs + tickets + exams à variantes) |
-| Curriculum carrière (ch. 7–15, atelier architecture, SOC) | Vision écrite, pas encore jouable |
+| Moteur + terminal | Solide pour les ch. 1–7 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier) |
+| Contenu jouable | Chapitres 1–7 (labs + tickets + exams à variantes + atelier palier 1) |
+| Curriculum carrière (ch. 8–15, SOC, atelier 5★) | Vision écrite, pas encore jouable |
 | SOC, certificats serveur, classe | Amorcé |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est un **début de carrière IT** (helpdesk Linux → adressage → segmentation → helpdesk Windows / Wi-Fi → systèmes / nginx / AD simulé → **pfSense / MikroTik / UniFi**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (atelier architecture, SOC, 5★). La suite utile : **E5**.
+Le prototype est un **début de carrière IT** (helpdesk → adressage → segmentation → Windows / Wi-Fi → systèmes → pfSense / MikroTik / UniFi → **atelier palier 1**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (SOC, architecture 5★). La suite utile : **E6**.
 
 ---
 

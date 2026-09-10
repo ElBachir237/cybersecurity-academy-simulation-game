@@ -33,6 +33,11 @@ import {
   seedFwRules,
   seedSwitchPorts,
 } from "./data/world";
+import {
+  findHostIdByIp,
+  isLabHost,
+  workshopConnected,
+} from "./data/workshop";
 
 export interface TermSignals {
   cmd: string;
@@ -127,6 +132,10 @@ function pathTo(target: string, host: HostRuntime, state: GameState): PathResult
   if (!iface || iface.state !== "up" || !iface.ip) return "no-iface";
   if (target === iface.ip) return "ok";
   if (target.startsWith("127.")) return "ok";
+  const destId = findHostIdByIp(target, state);
+  if (isLabHost(host.id) || (destId && isLabHost(destId))) {
+    if (!destId || !workshopConnected(host.id, destId, state)) return "no-route";
+  }
   if (iface.cidr && sameSubnet(target, iface.ip, iface.cidr)) {
     return l2Allowed(host, target, state) ? "ok" : "no-route";
   }
@@ -503,6 +512,33 @@ function cmdSwitchport(args: string[], host: HostRuntime, state: GameState, sudo
 function cmdIp(args: string[], host: HostRuntime): string[] {
   const sub = args[0];
   const out: string[] = [];
+  if ((sub === "addr" || sub === "a") && args[1] === "add") {
+    const spec = args[2] ?? "";
+    const [ip, bits] = spec.split("/");
+    const cidr = Number(bits ?? "24");
+    const devIdx = args.indexOf("dev");
+    const dev = (devIdx >= 0 ? args[devIdx + 1] : Object.keys(host.ifaces)[0]) ?? "eth0";
+    const iface = host.ifaces[dev];
+    if (!iface) return [`Cannot find device "${dev}"`];
+    if (!ip || !/^\d+\.\d+\.\d+\.\d+$/.test(ip) || !Number.isInteger(cidr) || cidr < 0 || cidr > 32) {
+      return ["ip: usage: ip addr add <ip>/<cidr> dev <iface>"];
+    }
+    host.ifaces[dev] = { ...iface, state: "up", dhcp: false, ip, cidr, gw: iface.gw };
+    host.logs.push(`Sep 12 ip: addr add ${ip}/${cidr} dev ${dev}`);
+    return [`${ip}/${cidr} added on ${dev}`];
+  }
+  if ((sub === "route" || sub === "r") && args[1] === "add") {
+    const viaIdx = args.indexOf("via");
+    const gw = viaIdx >= 0 ? args[viaIdx + 1] : "";
+    if (!gw || !/^\d+\.\d+\.\d+\.\d+$/.test(gw)) {
+      return ["ip: usage: ip route add default via <gateway>"];
+    }
+    const picked = primaryIface(host);
+    if (!picked) return ["ip: no interface"];
+    host.ifaces[picked.name] = { ...picked.iface, gw };
+    host.logs.push(`Sep 12 ip: default via ${gw}`);
+    return [`default via ${gw} dev ${picked.name}`];
+  }
   if (sub === "addr" || sub === "a" || sub === undefined) {
     out.push("1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000");
     out.push("    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00");
@@ -648,7 +684,10 @@ function cmdCurl(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
   if (!ip || !ipReachable(ip, host, state)) {
     return [t("terminal.curlFail", { url })];
   }
-  const web = state.world.hosts["SRV-WEB"];
+  const destId = findHostIdByIp(ip, state);
+  const dest = destId ? state.world.hosts[destId] : undefined;
+  const web =
+    dest && dest.services.nginx !== undefined ? dest : state.world.hosts["SRV-WEB"];
   if (!web || web.services.nginx !== "active") {
     return [`curl: (7) Failed to connect to ${hostName} port 80: Connection refused`];
   }
@@ -679,8 +718,8 @@ function cmdCurl(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
 }
 
 function cmdNsupdate(args: string[], host: HostRuntime, state: GameState, sudo: boolean, t: TFn): string[] {
-  if (host.id !== "DNS-01") {
-    return ["nsupdate: this host cannot update the HORIZON zone — use DNS-01"];
+  if (host.id !== "DNS-01" && host.services.named !== "active") {
+    return ["nsupdate: this host cannot update the zone — use DNS-01 or a named server"];
   }
   if (!sudo) return [t("terminal.permissionDenied")];
   if (args[0] !== "add") {
@@ -706,8 +745,8 @@ function cmdLn(args: string[], host: HostRuntime, state: GameState, sudo: boolea
   if (!name || !state.world.vhosts?.[name]) {
     return [`ln: failed to access '${src}': No such file or directory`];
   }
-  if (host.id !== "SRV-WEB") {
-    return ["ln: nginx sites live on SRV-WEB"];
+  if (host.services.nginx === undefined) {
+    return ["ln: nginx sites live on a web server"];
   }
   state.world.vhosts[name] = { ...state.world.vhosts[name], enabled: true };
   host.logs.push(`Sep 12 nginx: enabled site ${name}`);
@@ -1198,6 +1237,7 @@ function execPfsenseShell(argv: string[], host: HostRuntime, state: GameState, t
     out.push("  pfctl -sn                 NAT");
     out.push("  pfctl -s interfaces       WAN/LAN");
     out.push("  easyrule delete wan <id>  retirer une règle (ex. PF-HOLE)");
+    out.push("  ifconfig <iface> <ip>/<cidr>  adresser LAN (ex. em1 10.20.0.1/24)");
     out.push("  ping <hôte>");
     return { output: out, signals };
   }
@@ -1215,8 +1255,10 @@ function execPfsenseShell(argv: string[], host: HostRuntime, state: GameState, t
       return { output: ["NAT RULES:", "nat on em0 inet from 10.0.0.0/8 to any -> (em0) port 1024:65535"], signals };
     }
     if (flag === "-si" || (flag === "-s" && (what === "interfaces" || what === "info"))) {
-      out.push("WAN (em0) 203.0.113.2/24");
-      out.push("LAN (em1) 10.0.0.2/24");
+      for (const [name, i] of Object.entries(host.ifaces)) {
+        const role = name === "em0" ? "WAN" : name === "em1" ? "LAN" : name;
+        out.push(`${role} (${name}) ${i.ip ? `${i.ip}/${i.cidr ?? 24}` : "unassigned"}`);
+      }
       return { output: out, signals };
     }
     return { output: ["pfctl: usage: pfctl -sr | -sn | -s interfaces"], signals };
@@ -1246,6 +1288,22 @@ function execPfsenseShell(argv: string[], host: HostRuntime, state: GameState, t
       return { output: [`easyrule: added ${id} ${action} any -> ${dst}`], signals };
     }
     return { output: ["easyrule: usage: easyrule delete wan <id> | easyrule pass wan <cidr>"], signals };
+  }
+  if (cmd === "ifconfig" || cmd === "set") {
+    const name = argv[1] === "lan" ? "em1" : argv[1] === "wan" ? "em0" : argv[1];
+    const spec = argv.find((a) => a.includes("/")) ?? argv[2];
+    const iface = name ? host.ifaces[name] : undefined;
+    if (!name || !iface || !spec) {
+      return { output: ["ifconfig: usage: ifconfig em1 10.20.0.1/24"], signals };
+    }
+    const [ip, bits] = spec.split("/");
+    const cidr = Number(bits ?? "24");
+    if (!ip || !/^\d+\.\d+\.\d+\.\d+$/.test(ip) || !Number.isInteger(cidr)) {
+      return { output: ["ifconfig: usage: ifconfig em1 10.20.0.1/24"], signals };
+    }
+    host.ifaces[name] = { ...iface, state: "up", dhcp: false, ip, cidr };
+    host.logs.push(`Sep 12 pf: ${name} ${ip}/${cidr}`);
+    return { output: [`${name}: ${ip}/${cidr}`], signals };
   }
   out.push(`${argv[0]}: unknown command — tapez help`);
   return { output: out, signals };
@@ -1452,6 +1510,8 @@ export function execTerminal(
       out.push(t("terminal.helpTitle"));
       out.push("  whoami hostname date uptime uname   — informations système");
       out.push("  ip addr | ip route | ip link        — configuration réseau");
+      out.push("  ip addr add <ip>/<cidr> dev <iface>  — adresser une interface");
+      out.push("  ip route add default via <gw>        — route par défaut");
       out.push("  ping <hôte>                          — tester la connectivité");
       out.push("  dig | nslookup | host <nom>          — résolution DNS");
       out.push("  curl <url>                           — requête HTTP interne");

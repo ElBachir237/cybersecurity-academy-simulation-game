@@ -552,6 +552,55 @@ function completeC6Unifi(e: GameEngine) {
   e.sendChat("itsupport", "isolation guest on");
 }
 
+function completeC6Sim(e: GameEngine) {
+  e.startMission("c6_sim", "pf");
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c6_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  run(e, "FW-PFS", "easyrule delete wan PF-HOLE");
+  e.sendChat("itsupport", "rapport: incident reseau clos");
+}
+
+function completeChapter6Ready(): GameEngine {
+  const e = completeChapter5Ready();
+  completeC6Lab(e);
+  completeC6Mt(e);
+  completeC6Unifi(e);
+  completeC6Sim(e);
+  return e;
+}
+
+function buildLabRack(e: GameEngine) {
+  for (const kind of ["pfsense", "switch", "server", "pc", "ap"] as const) {
+    e.dispatchAction("workshop-place", { kind });
+  }
+  e.dispatchAction("workshop-cable", { a: "LAB-FW", b: "LAB-SW" });
+  e.dispatchAction("workshop-cable", { a: "LAB-SW", b: "LAB-WEB" });
+  e.dispatchAction("workshop-cable", { a: "LAB-SW", b: "LAB-PC" });
+  e.dispatchAction("workshop-cable", { a: "LAB-SW", b: "LAB-AP" });
+}
+
+function completeE5Lab(e: GameEngine) {
+  e.startMission("e5_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  buildLabRack(e);
+}
+
+function completeE5Site(e: GameEngine) {
+  e.startMission("e5_site");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e5_site.mailTicketSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "LAB-FW", "ifconfig em1 10.20.0.1/24");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "LAB-WEB", "ip addr add 10.20.0.20/24 dev eth0");
+  run(e, "LAB-PC", "ip addr add 10.20.0.24/24 dev eth0");
+  run(e, "LAB-WEB", "sudo nsupdate add lab.horizon.local A 10.20.0.20");
+  run(e, "LAB-WEB", "sudo ln -s /etc/nginx/sites-available/lab.horizon.local /etc/nginx/sites-enabled/lab.horizon.local");
+  run(e, "LAB-PC", "curl lab.horizon.local");
+  e.sendChat("itsupport", "lab.horizon.local 200");
+}
+
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
 {
   const e = newEngine();
@@ -1428,6 +1477,126 @@ console.log("\n[36] OLD SAVE — missing c6 hosts still start after chapter 5");
   assert(e.state.world.hosts["PC-LEA"]?.ifaces.eth0.ip === "192.168.50.24", "PC-LEA hydrated");
   assert(e.state.world.hosts["SRV-WEB"]?.os.includes("Debian") || !!e.state.world.hosts["SRV-WEB"], "SRV-WEB still present");
   assert(e.state.world.hosts["RTR-HQ"]?.ifaces.eth5?.ip === "172.16.0.1", "RTR-HQ eth5 hydrated on old save");
+}
+
+console.log("\n[37] CHAPTER 7 LAB e5_lab");
+{
+  const e = completeChapter6Ready();
+  assert(e.state.missions["e5_lab"].status === "available", "e5_lab unlocked after chapter 6");
+  e.startMission("e5_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  assert(!e.state.world.hosts["LAB-FW"], "rack empty at lab start");
+  e.dispatchAction("workshop-place", { kind: "pfsense" });
+  e.dispatchAction("workshop-place", { kind: "switch" });
+  e.dispatchAction("workshop-place", { kind: "server" });
+  e.dispatchAction("workshop-place", { kind: "pc" });
+  e.dispatchAction("workshop-place", { kind: "ap" });
+  assert(!!e.state.world.hosts["LAB-FW"] && !!e.state.world.hosts["LAB-SW"], "devices placed");
+  e.dispatchAction("workshop-cable", { a: "LAB-FW", b: "LAB-SW" });
+  e.dispatchAction("workshop-cable", { a: "LAB-SW", b: "LAB-WEB" });
+  e.dispatchAction("workshop-cable", { a: "LAB-SW", b: "LAB-PC" });
+  e.dispatchAction("workshop-cable", { a: "LAB-SW", b: "LAB-AP" });
+  assert(e.state.missions["e5_lab"].status === "completed", "e5_lab completed");
+  assert(e.state.badges.includes("rack_builder"), "badge rack_builder");
+  assert(e.state.missions["e5_site"].status === "available", "e5_site unlocked");
+}
+
+console.log("\n[37b] CHAPTER 7 ERROR — skip switch");
+{
+  const e = completeChapter6Ready();
+  e.startMission("e5_lab");
+  assert(e.state.pendingDecision?.id === "e5_skip", "skip switch decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["e5_lab"].errorKeys.includes("skip_switch"), "skip_switch recorded");
+  buildLabRack(e);
+  assert(e.state.missions["e5_lab"].status === "completed", "still completable");
+  assert(e.state.missions["e5_lab"].score < 100, "score penalized");
+}
+
+console.log("\n[38] CHAPTER 7 MISSION e5_site");
+{
+  const e = completeChapter6Ready();
+  completeE5Lab(e);
+  e.startMission("e5_site");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.e5_site.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "LAB-FW", "ifconfig em1 10.20.0.1/24");
+  assert(e.state.world.hosts["LAB-FW"]?.ifaces.em1?.ip === "10.20.0.1", "LAN address on pfSense");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "LAB-WEB", "ip addr add 10.20.0.20/24 dev eth0");
+  run(e, "LAB-PC", "ip addr add 10.20.0.24/24 dev eth0");
+  run(e, "LAB-WEB", "sudo nsupdate add lab.horizon.local A 10.20.0.20");
+  run(e, "LAB-WEB", "sudo ln -s /etc/nginx/sites-available/lab.horizon.local /etc/nginx/sites-enabled/lab.horizon.local");
+  const page = run(e, "LAB-PC", "curl lab.horizon.local").join("\n");
+  assert(page.includes("200"), "lab site 200 from LAB-PC");
+  e.sendChat("itsupport", "lab.horizon.local 200");
+  assert(e.state.missions["e5_site"].status === "completed", "e5_site completed");
+  assert(e.state.missions["e5_sim"].status === "available", "e5_sim unlocked");
+}
+
+console.log("\n[38b] CHAPTER 7 ERROR — skip DNS");
+{
+  const e = completeChapter6Ready();
+  completeE5Lab(e);
+  e.startMission("e5_site");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.e5_site.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "LAB-FW", "ifconfig em1 10.20.0.1/24");
+  assert(e.state.pendingDecision?.id === "e5s_dns", "skip DNS decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["e5_site"].errorKeys.includes("skip_dns"), "skip_dns recorded");
+  run(e, "LAB-WEB", "ip addr add 10.20.0.20/24 dev eth0");
+  run(e, "LAB-PC", "ip addr add 10.20.0.24/24 dev eth0");
+  run(e, "LAB-WEB", "sudo nsupdate add lab.horizon.local A 10.20.0.20");
+  run(e, "LAB-WEB", "sudo ln -s /etc/nginx/sites-available/lab.horizon.local /etc/nginx/sites-enabled/lab.horizon.local");
+  run(e, "LAB-PC", "curl lab.horizon.local");
+  e.sendChat("itsupport", "site ok malgre tout");
+  assert(e.state.missions["e5_site"].status === "completed", "still completable");
+  assert(e.state.missions["e5_site"].score < 100, "score penalized");
+}
+
+for (const variant of ["cable", "addr", "nginx"] as const) {
+  console.log(`\n[39] SIM e5_sim variant=${variant}`);
+  const e = completeChapter6Ready();
+  completeE5Lab(e);
+  completeE5Site(e);
+  e.startMission("e5_sim", variant);
+  assert(e.state.missions["e5_sim"].variant === variant, `variant is ${variant}`);
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.e5_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  if (variant === "cable") {
+    e.dispatchAction("workshop-cable", { a: "LAB-SW", b: "LAB-WEB" });
+  } else if (variant === "addr") {
+    run(e, "LAB-WEB", "ip addr add 10.20.0.20/24 dev eth0");
+  } else {
+    run(e, "LAB-WEB", "sudo systemctl start nginx");
+  }
+  const verify = run(e, "LAB-PC", "curl lab.horizon.local").join("\n");
+  assert(verify.includes("200"), `[${variant}] lab site verified`);
+  e.sendChat("itsupport", "rapport: atelier clos");
+  const s = e.state.missions["e5_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed (status=${s.status})`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "Junior Architect"),
+    `[${variant}] Junior Architect certificate`
+  );
+  assert(e.state.chapter >= 8, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[40] OLD SAVE — missing e5_lab runtime still starts after chapter 6");
+{
+  const e = completeChapter6Ready();
+  delete e.state.missions["e5_lab"];
+  delete e.state.missions["e5_site"];
+  delete e.state.missions["e5_sim"];
+  e.startMission("e5_lab");
+  assert(e.state.activeMissionId === "e5_lab", "e5_lab starts from a save that lacked workshop runtimes");
+  assert(Array.isArray(e.state.world.workshop?.nodes), "workshop hydrated");
 }
 
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);

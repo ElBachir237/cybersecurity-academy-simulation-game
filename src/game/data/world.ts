@@ -663,6 +663,12 @@ export function seedVhosts(): Record<string, Vhost> {
       title: "HORIZON RH",
       body: "Portail RH interne — congés, bulletins, annuaire.",
     },
+    "lab.horizon.local": {
+      serverName: "lab.horizon.local",
+      enabled: false,
+      title: "HORIZON Lab",
+      body: "Atelier architecture — palier 1. Le rack que vous avez câblé.",
+    },
   };
 }
 
@@ -695,14 +701,14 @@ export function seedDirectory(): Record<string, DirectoryUser> {
   };
 }
 
-/** HTTP site currently served by SRV-WEB (nginx up + vhost enabled). */
+/** HTTP site served by any host with nginx active + vhost enabled. */
 export function httpSite(
   name: string,
   state: GameState
 ): { title: string; body: string; status: number } | null {
   const clean = name.replace(/^https?:\/\//, "").split("/")[0].split(":")[0].toLowerCase();
-  const web = state.world.hosts["SRV-WEB"];
-  if (!web || web.services.nginx !== "active") return null;
+  const nginxUp = Object.values(state.world.hosts).some((h) => h.services.nginx === "active");
+  if (!nginxUp) return null;
   const vhosts = state.world.vhosts ?? {};
   const vh = vhosts[clean];
   if (vh) {
@@ -711,6 +717,8 @@ export function httpSite(
   }
   const catalog = INTERNAL_SITES[clean];
   if (!catalog) return null;
+  const hq = state.world.hosts["SRV-WEB"];
+  if (!hq || hq.services.nginx !== "active") return null;
   return { title: catalog.title, body: catalog.body, status: 200 };
 }
 

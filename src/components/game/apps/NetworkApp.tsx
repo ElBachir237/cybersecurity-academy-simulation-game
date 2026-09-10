@@ -4,11 +4,12 @@
 // HORIZON OS — Network: topology viewer + subnet calculator
 // ============================================================
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGame } from "../context";
 import { Icon } from "../ui";
 import { TOPO_LINKS, TOPO_NODES, type TopoNode } from "@/game/data/world";
 import type { HostRuntime } from "@/game/types";
+import type { WorkshopKind } from "@/game/data/workshop";
 
 function ipToInt(ip: string): number {
   return ip.split(".").reduce((a, o) => (a << 8) + parseInt(o, 10), 0) >>> 0;
@@ -38,8 +39,10 @@ function calcSubnet(ip: string, cidr: number) {
 
 export default function NetworkApp() {
   const { state, engine, t } = useGame();
-  const [tab, setTab] = useState<"topo" | "calc">("topo");
+  const [tab, setTab] = useState<"topo" | "workshop" | "calc">("topo");
   const [sel, setSel] = useState<string | null>(null);
+  const [cableFrom, setCableFrom] = useState<string | null>(null);
+  const [cableMode, setCableMode] = useState(false);
   const [ip, setIp] = useState("10.0.0.0");
   const [cidr, setCidr] = useState(26);
   const [count, setCount] = useState(0);
@@ -79,12 +82,41 @@ export default function NetworkApp() {
     Object.values(h.ifaces).some((i) => i.state === "up" && (i.ip || i.dhcp));
 
   const selHost = sel ? state.world.hosts[sel] : null;
+  const workshopOpen =
+    state.completedMissions.includes("c6_sim") ||
+    ["available", "active", "completed"].includes(state.missions["e5_lab"]?.status ?? "");
+  const ws = state.world.workshop ?? { nodes: [], links: [] };
+
+  useEffect(() => {
+    if (state.activeMissionId?.startsWith("e5_")) setTab("workshop");
+  }, [state.activeMissionId]);
+
+  const place = (kind: WorkshopKind) => {
+    engine.dispatchAction("workshop-place", { kind });
+  };
+  const clickWorkshopNode = (id: string) => {
+    if (cableMode) {
+      if (!cableFrom) {
+        setCableFrom(id);
+        setSel(id);
+        return;
+      }
+      if (cableFrom !== id) engine.dispatchAction("workshop-cable", { a: cableFrom, b: id });
+      setCableFrom(null);
+      setSel(id);
+      return;
+    }
+    setSel(sel === id ? null : id);
+  };
 
   return (
     <div className="flex h-full flex-col">
       {/* tabs */}
       <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-hz-border p-2">
         <TabBtn active={tab === "topo"} onClick={() => setTab("topo")} icon="network" label={t("network.devices")} />
+        {workshopOpen && (
+          <TabBtn active={tab === "workshop"} onClick={() => setTab("workshop")} icon="layers" label={t("workshop.tab")} />
+        )}
         <TabBtn active={tab === "calc"} onClick={() => setTab("calc")} icon="cpu" label="CIDR" />
         <div className="ml-auto hidden items-center gap-3 pr-2 text-[11px] text-hz-muted sm:flex">
           <span className="flex items-center gap-1.5">
@@ -99,7 +131,107 @@ export default function NetworkApp() {
         </div>
       </div>
 
-      {tab === "topo" ? (
+      {tab === "workshop" ? (
+        <div className="hz-network-layout">
+          <div className="hz-network-map">
+            <div className="absolute left-2 right-2 top-2 z-10 flex flex-wrap items-center gap-1">
+              {(["pfsense", "switch", "server", "pc", "ap"] as WorkshopKind[]).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  data-testid={`workshop-place-${kind}`}
+                  className="hz-btn hz-btn-ghost px-2 py-1 text-[11px]"
+                  onClick={() => place(kind)}
+                >
+                  {t(`workshop.kind.${kind}`)}
+                </button>
+              ))}
+              <button
+                type="button"
+                data-testid="workshop-cable"
+                className={`hz-btn px-2 py-1 text-[11px] ${cableMode ? "hz-btn-primary" : "hz-btn-ghost"}`}
+                onClick={() => {
+                  setCableMode((v) => !v);
+                  setCableFrom(null);
+                }}
+              >
+                {t("workshop.cable")}
+              </button>
+            </div>
+            <svg viewBox="0 0 800 400" className="h-full w-full" aria-label={t("workshop.tab")} data-testid="workshop-map">
+              {ws.links.map(([a, b]) => {
+                const na = ws.nodes.find((n) => n.id === a);
+                const nb = ws.nodes.find((n) => n.id === b);
+                if (!na || !nb) return null;
+                return (
+                  <line
+                    key={`${a}-${b}`}
+                    x1={na.x}
+                    y1={na.y}
+                    x2={nb.x}
+                    y2={nb.y}
+                    stroke="rgba(53,224,210,0.4)"
+                    strokeWidth={2}
+                  />
+                );
+              })}
+              {ws.nodes.map((n) => {
+                const h = state.world.hosts[n.id];
+                const up = h ? hostUp(h) : false;
+                const active = sel === n.id || cableFrom === n.id;
+                return (
+                  <g
+                    key={n.id}
+                    transform={`translate(${n.x},${n.y})`}
+                    className="cursor-pointer"
+                    data-testid={`workshop-node-${n.id}`}
+                    onClick={() => clickWorkshopNode(n.id)}
+                  >
+                    <rect
+                      x={-36}
+                      y={-22}
+                      width={72}
+                      height={44}
+                      rx={9}
+                      fill={active ? "rgba(53,224,210,0.18)" : "rgba(13,20,36,0.92)"}
+                      stroke={active ? "var(--color-hz-accent)" : "var(--color-hz-border)"}
+                      strokeWidth={active ? 1.8 : 1.2}
+                    />
+                    <text textAnchor="middle" y={-2} fontSize={11} fill={up ? "var(--color-hz-text)" : "var(--color-hz-muted)"} fontWeight={600}>
+                      {n.id}
+                    </text>
+                    <circle cx={28} cy={-14} r={4} fill={up ? "var(--color-hz-green)" : "var(--color-hz-amber)"} />
+                  </g>
+                );
+              })}
+            </svg>
+            <div className="pointer-events-none absolute bottom-2 left-3 text-[10.5px] text-hz-muted">
+              {cableMode ? t("workshop.cableHint") : t("workshop.hint")}
+            </div>
+          </div>
+          <div className="hz-network-details">
+            {selHost && ws.nodes.some((n) => n.id === sel) ? (
+              <div className="anim-fade-in">
+                <h3 className="text-[14px] font-bold">{selHost.label}</h3>
+                <p className="mb-3 text-[11px] text-hz-muted">{selHost.os}</p>
+                {Object.entries(selHost.ifaces).map(([name, i]) => (
+                  <div key={name} className="mb-1.5 rounded-lg border border-hz-border p-2 text-[11.5px]">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-semibold">{name}</span>
+                      <span className="font-mono text-hz-muted">{i.ip ? `${i.ip}/${i.cidr}` : "—"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-40 flex-col items-center justify-center text-center text-hz-muted">
+                <Icon name="layers" size={26} className="mb-2 opacity-40" />
+                <p className="text-[12px]">{t("workshop.empty")}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : tab === "topo" ? (
         <div className="hz-network-layout">
           <div className="hz-network-map">
             <svg viewBox="0 0 800 400" className="h-full w-full" aria-label={t("network.title")}>

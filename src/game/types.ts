@@ -6,6 +6,7 @@
 
 import type { TFn } from "./i18n";
 import type { WorkspaceState } from "./workspace";
+import type { WorkshopState } from "./data/workshop";
 
 export type Lang = "fr" | "en";
 
@@ -158,6 +159,7 @@ export interface GameWorld {
   enforceAccessVlan?: boolean;
   vhosts?: Record<string, Vhost>;
   directory?: Record<string, DirectoryUser>;
+  workshop?: WorkshopState;
 }
 
 // ---------------- Mail / Chat / Notifications ----------------
