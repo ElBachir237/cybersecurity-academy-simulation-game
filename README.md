@@ -2,7 +2,7 @@
 
 Simulation pédagogique immersive de cybersécurité.
 
-Vous n’êtes pas un joueur qui chasse un flag. Vous êtes un **jeune pro** chez **HORIZON CORPORATION**. Vous commencez au helpdesk, vous prenez des décisions qui restent sur votre dossier, et vous pouvez, plus tard, **concevoir** le réseau que vous avez d’abord réparé. Mail, chat, tickets, terminaux (Linux, puis Windows, switch, AP), carte réseau, SOC. Les pannes sont dans le monde simulé.
+Vous n’êtes pas un joueur qui chasse un flag. Vous êtes un **jeune pro** chez **HORIZON CORPORATION**. Vous commencez au helpdesk, vous prenez des décisions qui restent sur votre dossier, et vous pouvez, plus tard, **concevoir et configurer** le siège (MikroTik, pfSense, UniFi, serveurs, sites web) que vous avez d’abord réparé. Mail, chat, tickets, terminaux et UI d’équipements, carte réseau, SOC. Les pannes sont dans le monde simulé.
 
 **Langues :** français / anglais (bascule en jeu, sans reset de partie).
 
@@ -38,14 +38,19 @@ Un bureau **HORIZON OS** avec des fenêtres, des notifications, du son, et une s
 | **Files / Tickets / Browser** | Contexte d’entreprise |
 | **Skills / Portfolio** | Compétences, badges, certificats |
 
-Le terminal n’est pas un décor. Les commandes **lisent et mutent le même état** que la carte réseau et les missions. Chaque famille d’équipement a **son** CLI (pas un faux langage unique) :
+Le terminal n’est pas un décor. Les commandes **lisent et mutent le même état** que la carte réseau et les missions. Chaque famille d’équipement a **son** CLI / son UI (pas un faux langage unique) :
 
-| Famille | CLI visé (simulé, cohérent avec le monde) |
+| Famille | Interface visée (simulée, syntaxe réelle) |
 | --- | --- |
-| Linux | `ip`, `ping`, `dig`, `systemctl`, `netplan`, `iptables`, … |
-| Windows | `ipconfig`, `ping`, `netsh`, `Get-EventLog` / PowerShell admin |
-| Switch / routeur | `show vlan`, `show ip route`, `interface` / `switchport`, ACL |
-| AP / caméra / imprimante | CLI ou UI web **d’administration** (SSID, VLAN, enregistrement) |
+| Linux (serveurs) | `ip`, `systemctl`, `nginx` / `apache2`, `sshd`, vhosts, TLS |
+| Windows | `ipconfig`, `ping`, `netsh`, PowerShell admin |
+| Cisco-like / HP | `show vlan`, `show ip route`, `switchport`, ACL |
+| **MikroTik (RouterOS)** | `/ip address`, `/ip route`, `/ip firewall`, `/interface`, NAT, DHCP |
+| **pfSense** | UI web + CLI : WAN/LAN, NAT, règles, OpenVPN, DHCP |
+| **Ubiquiti** | UniFi Network (SSID, VLAN, gateway) + CLI AP / UDM |
+| Caméra / imprimante | UI admin (enregistrement, VLAN isolé, ACL) |
+
+Aujourd’hui le siège a déjà `SRV-WEB` (nginx), `AP-01` (UniFi), `SW-01`, `FW-CORE` (iptables générique). La suite **remplace le générique par le matériel de terrain** : tu configures **le même** NAT / VLAN / DHCP, mais sur RouterOS, pfSense ou une passerelle UniFi — et le Browser in-game **affiche vraiment** le site que tu as hébergé.
 
 Ce sont des commandes **d’exploitation légitime** (admin, diag, durcissement). Le jeu **n’inclura pas** Metasploit, payloads, modules d’exploit, ni procédures d’attaque copiables. La piste pentest / Red Team se joue **côté défense et audit interne** : tu vois ce qui s’est passé, tu contiens, tu corriges, tu rapportes.
 
@@ -109,16 +114,36 @@ Le nombre de chapitres **peut augmenter**. L’essentiel : **notions, compétenc
 - **Temps imparti** : missions et examens ont une horloge (crise, direction qui relance). Dépasser le délai = score, réputation, parfois un ticket d’escalade — comme au bureau.
 - **Dossier de carrière** : chaque décision (laisser un trou, mal rassurer Marie, isoler trop large) s’inscrit sur le personnage. Les chapitres suivants peuvent la rappeler.
 - **Équipe** (après le SOC L1) : rôles helpdesk / admin / SOC L1–L2, partie partagée, vue formateur. Pas avant d’avoir un métier solo jouable.
-- **Atelier architecture** (mode bac à sable, débloqué progressivement) : tu **dessines** le réseau d’une entreprise (VLAN, FW, AD, Wi-Fi, cloud HORIZON), tu **configures** avec les vrais CLI d’admin, tu **simules** le trafic (ping, ACL, DHCP). C’est le Packet Tracer d’HORIZON, branché sur les compétences déjà apprises — pas un second jeu déconnecté.
+- **Atelier architecture** (mode bac à sable, débloqué progressivement) : tu **poses** le matériel (MikroTik, pfSense, UniFi Gateway, switch, serveurs, AP, caméras), tu **câbles**, tu **configures** avec le CLI / l’UI de chaque marque, tu **héberges** des sites (intranet, vitrine, reverse proxy), tu **simules** le trafic. C’est le Packet Tracer d’HORIZON, branché sur les compétences déjà apprises — pas un second jeu déconnecté.
+
+### Parc d’équipements (le siège n’est pas un lab abstrait)
+
+HORIZON CORPORATION a un **vrai parc**, enrichi chapitre après chapitre. Tu ne « débloques pas une leçon iptables » : tu **prends la main** sur la boîte.
+
+| Équipement | Rôle dans le siège | Où tu le vis |
+| --- | --- | --- |
+| **PC Windows / Linux** | Postes utilisateurs | Ch. 1–4 |
+| **AP UniFi** | SSID, VLAN Wi-Fi, isolation client | Ch. 4, puis 6 |
+| **Serveurs** (`SRV-WEB`, fichiers, DNS, AD) | Services, journaux, sauvegarde | Ch. 5 |
+| **Hébergement web** | vhosts nginx/Apache, DNS interne, TLS, reverse proxy — le site s’ouvre dans **Browser** | Ch. 5 (intranet), ch. 11 (durcissement + sites publics) |
+| **Switch d’accès** | VLAN, trunk, port security | Ch. 3, 6 |
+| **pfSense** | Pare-feu / NAT / VPN du siège (remplace progressivement le `FW-CORE` générique) | Ch. 6 |
+| **MikroTik (RouterOS)** | Routeur filiale / edge : IP, NAT, firewall, DHCP, PPPoE | Ch. 6, atelier |
+| **Passerelle Ubiquiti (UDM / USG)** | WAN, LAN, VLAN, Wi-Fi unifié | Ch. 4 (AP), ch. 6 (gateway) |
+| **Caméras / OT** | VLAN isolé, pas d’Internet direct | Ch. 6, atelier 5★ |
+
+Même politique, **syntaxes différentes** : un trou `0.0.0.0/0` se voit aussi bien en `iptables` qu’en `/ip firewall nat` ou dans l’UI pfSense. C’est voulu : sur le terrain tu changes de marque, pas de métier.
 
 ### Ce que « vrai AD / malware / AWS / pentest » veut dire ici
 
 | Compétence visée | Dans HORIZON | Hors jeu (refusé) |
 | --- | --- | --- |
 | Active Directory | Annuaire simulé : users, OU, GPO, lockout, groupes | Installer un vrai domaine / outils d’attaque AD |
+| Pare-feu / routeur | **pfSense**, **MikroTik RouterOS**, **UniFi Gateway** : mêmes politiques, syntaxe/UI de la marque | Firmware réel, accès WAN réel, exploits d’équipements |
+| Hébergement web | nginx/Apache **dans le monde** : vhosts, DNS, TLS, site visible dans Browser | PoC d’exploit, SQLi copiable, scanner de prod |
 | Malware | Sandbox SOC : hash, strings, comportement narré | Binaire exécutable, dropper, payload |
 | Cloud | Console **HORIZON Cloud** (IAM, SG, bucket) | Clone AWS et recettes d’intrusion |
-| Web | Config / session / perms sur `SRV-WEB` | PoC d’exploit, SQLi copiable |
+| Web / AppSec | Auth, session, perms, headers sur les sites **déjà hébergés** | PoC d’exploit, SQLi copiable |
 | Pentest | Audit interne + findings + correctifs | Metasploit, exploits, mouvement latéral « pour de vrai » |
 
 ---
@@ -149,23 +174,23 @@ Helpdesk Linux, adressage, segmentation. Voir ci-dessus.
 
 **Skills :** `windows_admin`, `wifi`, `computer_basics`, `network_diag`. Certificat visé : **Service Desk Associate**.
 
-### Chapitre 5 — Systèmes (Linux & Windows)
+### Chapitre 5 — Systèmes & hébergement
 
-**But :** administrer, pas seulement dépanner. Services, logs, sauvegarde, un premier **annuaire**.
+**But :** administrer des **serveurs**, pas seulement dépanner un PC. Services, logs, sauvegarde, premier **annuaire**, et **mettre un site en ligne** dans le monde.
 
-**Objectif :** relancer un service sans casser l’étage ; lire un journal ; créer un utilisateur dans l’AD **simulé**.
+**Objectif :** relancer `nginx` / `smbd` sans casser l’étage ; créer un vhost `intranet.horizon.local` que le Browser ouvre vraiment ; créer un utilisateur dans l’AD **simulé**.
 
-**Skills :** `linux_admin`, `windows_admin`, `services`, `active_directory` (base). Certificat : **Systems Technician**.
+**Skills :** `linux_admin`, `windows_admin`, `services`, `web_hosting`, `active_directory` (base). Certificat : **Systems Technician**.
 
-### Chapitre 6 — Admin réseau d’entreprise
+### Chapitre 6 — Admin réseau d’entreprise (le vrai matériel)
 
-**But :** le quotidien admin réseau : VPN, Wi-Fi d’entreprise, DHCP multi-VLAN, supervision — CLI switch/routeur/AP complets (toujours simulés, syntaxe réelle).
+**But :** le quotidien : tu ne parles plus à un FW générique. Tu configures **pfSense**, **MikroTik**, **passerelle UniFi**, switch, AP — NAT, VLAN, DHCP, VPN, WAN.
 
-**Objectif :** un changement de VLAN / d’ACL tenu de bout en bout, vérifié par ping et par un collègue.
+**Objectif :** un changement tenu de bout en bout (ex. filiale MikroTik + siège pfSense + SSID UniFi) vérifié par ping, par un collègue, et par un site qui répond derrière le reverse proxy.
 
-**Skills :** `routing`, `switching`, `vlan`, `firewall`, `wifi`. Certificat : **Network Administrator**.
+**Skills :** `routing`, `switching`, `vlan`, `firewall`, `wifi`, `mikrotik`, `pfsense`, `unifi`. Certificat : **Network Administrator**.
 
-**Atelier architecture — palier 1 :** tu poses toi-même VLAN + GW + FW d’un petit siège (5–20 hôtes) et tu dois faire passer le plan d’adressage + la segmentation du ch. 3.
+**Atelier architecture — palier 1 :** tu **places** toi-même un pfSense (ou un MikroTik), un switch, un AP UniFi, un `SRV-WEB` ; tu câbles ; tu dois faire passer adressage + segmentation + **un site intranet joignable**.
 
 ### Chapitre 7 — SOC L1
 
@@ -197,7 +222,7 @@ Helpdesk Linux, adressage, segmentation. Voir ci-dessus.
 
 ### Chapitre 11 — Sécurité web & applicative (défense)
 
-**But :** durcir `SRV-WEB` (auth, session, perms, headers). Pas de kit d’exploitation.
+**But :** durcir et **exploiter** l’hébergement : vhosts, TLS, reverse proxy, perms, headers — le site public HORIZON tourne **dans** le Browser. Pas de kit d’exploitation.
 
 **Skills :** `http`, `auth`, `web_security`, `api_security`. Certificat : **AppSec Defender**.
 
@@ -213,7 +238,7 @@ Helpdesk Linux, adressage, segmentation. Voir ci-dessus.
 
 **But :** concevoir : segmentation, IAM, défense en profondeur, Zero Trust **sur le parc déjà vécu**.
 
-**Objectif (atelier palier 3) :** une architecture **5 étoiles** (campus, DMZ, OT/caméras en VLAN isolé, cloud, bastion) que tu configures toi-même et que le simulateur **fait vivre** (trafic, pannes, audit).
+**Objectif (atelier palier 3) :** une architecture **5 étoiles** — campus UniFi, edge MikroTik, pare-feu pfSense, DMZ web, OT/caméras isolées, cloud, bastion — que tu **câbles et configures** (CLI/UI de chaque marque) et que le simulateur **fait vivre** (trafic, sites hébergés, pannes, audit).
 
 **Skills :** `seg_arch`, `zero_trust`, `iam`, `pki`. Certificat : **Security Engineer**.
 
@@ -242,9 +267,9 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E0** | Ce document de vision (ce commit) | Alignement produit |
 | **E1** | Ch. 4 Helpdesk : Windows + `ipconfig`/`netsh` + Wi-Fi/AP | Métier junior, plus seulement Linux |
 | **E2** | Horloge de mission + dossier de carrière (décisions persistantes) | Pression « monde réel » |
-| **E3** | Ch. 5 Systèmes + AD simulé (users/OU/GPO, pas un vrai DC attaquable) | Admin |
-| **E4** | Ch. 6 Admin réseau + CLI switch/routeur/AP enrichi | Quotidien réseau |
-| **E5** | **Atelier architecture palier 1** (éditeur de topologie + simu ping/ACL) | « Je construis le siège » |
+| **E3** | Ch. 5 Systèmes + AD simulé + **hébergement** (vhost nginx, site visible dans Browser) | Admin + sites |
+| **E4** | Ch. 6 : **pfSense + MikroTik RouterOS + passerelle UniFi** (plus le FW générique seul) | Quotidien réseau réel |
+| **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | « Je construis le siège » |
 | **E6** | Ch. 7 SOC L1 + app SOC branchée + timer | Porte d’entrée cyber |
 | **E7** | Co-op 2 joueurs (helpdesk + SOC) + vue formateur | Travail en équipe |
 | **E8** | Ch. 8–10 (L2, IR, DFIR) dans l’ordre | Analyste → DFIR |
@@ -367,10 +392,12 @@ Aujourd’hui une mission = TypeScript + closures. Un formateur ne peut pas écr
 ### 3. Monde simulé plus riche
 
 - Hôtes **Windows** et CLI `ipconfig` / `netsh` (chapitre 4).
+- **MikroTik RouterOS**, **pfSense**, **passerelle UniFi** (ch. 6) — syntaxe / UI de chaque marque.
+- Serveurs + **hébergement web** : vhosts, DNS, TLS, sites qui s’ouvrent dans Browser.
 - Active Directory **simulé**, IAM, certificats PKI — les skills existent, le monde non encore.
 - SIEM plus crédible : corrélation, fenêtres de logs, fausse piste.
 - Pannes **multi-hôtes** (un DHCP down qui casse un étage, pas un PC).
-- **Atelier architecture** : cliquer, câbler, configurer, simuler.
+- **Atelier architecture** : cliquer, câbler, configurer les vraies boîtes, simuler.
 - Mode **crise** (`tense` / `crisis`) : timer, direction qui appelle, tickets qui s’empilent.
 
 ### 4. Produit & classe
@@ -418,11 +445,11 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
 | Moteur + terminal réseau | Solide pour les chapitres 1–3 (Linux, VLAN, FW, switch) |
 | Contenu jouable | Chapitres 1–3 (lab + tickets + exams à variantes, ch. 3 = 5 missions) |
-| Curriculum carrière (ch. 4–15, atelier, timer, co-op) | Vision écrite, pas encore jouable |
+| Curriculum carrière (ch. 4–15, pfSense/MikroTik/UniFi, hébergement, atelier) | Vision écrite, pas encore jouable |
 | SOC, certificats serveur, classe | Amorcé |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est convaincant comme **début de carrière IT / réseau** (helpdesk Linux → adressage → segmentation). Ce n’est pas encore l’académie complète (Windows, AD, SOC, architecture 5★, équipe). La suite utile n’est pas « plus d’UI », c’est **le palier suivant du métier** (étape E1).
+Le prototype est convaincant comme **début de carrière IT / réseau** (helpdesk Linux → adressage → segmentation). Ce n’est pas encore l’académie complète (Windows, pfSense, MikroTik, UniFi, hébergement, AD, SOC, architecture 5★). La suite utile n’est pas « plus d’UI », c’est **le palier suivant du métier** (étape E1).
 
 ---
 
