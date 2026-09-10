@@ -4,12 +4,17 @@
 // HORIZON OS — Network: topology viewer + subnet calculator
 // ============================================================
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "../context";
 import { Icon } from "../ui";
 import { TOPO_LINKS, TOPO_NODES, type TopoNode } from "@/game/data/world";
 import type { HostRuntime } from "@/game/types";
-import type { WorkshopKind } from "@/game/data/workshop";
+import {
+  CANVAS_H,
+  CANVAS_W,
+  WORKSHOP_CATALOG,
+  type WorkshopKind,
+} from "@/game/data/workshop";
 
 function ipToInt(ip: string): number {
   return ip.split(".").reduce((a, o) => (a << 8) + parseInt(o, 10), 0) >>> 0;
@@ -42,7 +47,10 @@ export default function NetworkApp() {
   const [tab, setTab] = useState<"topo" | "workshop" | "calc">("topo");
   const [sel, setSel] = useState<string | null>(null);
   const [cableFrom, setCableFrom] = useState<string | null>(null);
-  const [cableMode, setCableMode] = useState(false);
+  const [tool, setTool] = useState<"select" | "cable" | "remove">("select");
+  const dragRef = useRef<{ id: string; dx: number; dy: number; moved: boolean; x: number; y: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [draftPos, setDraftPos] = useState<Record<string, { x: number; y: number }>>({});
   const [ip, setIp] = useState("10.0.0.0");
   const [cidr, setCidr] = useState(26);
   const [count, setCount] = useState(0);
@@ -86,6 +94,7 @@ export default function NetworkApp() {
     state.completedMissions.includes("c6_sim") ||
     ["available", "active", "completed"].includes(state.missions["e5_lab"]?.status ?? "");
   const ws = state.world.workshop ?? { nodes: [], links: [] };
+  const nodePos = (id: string) => draftPos[id] ?? ws.nodes.find((n) => n.id === id);
 
   useEffect(() => {
     if (state.activeMissionId?.startsWith("e5_")) setTab("workshop");
@@ -94,8 +103,23 @@ export default function NetworkApp() {
   const place = (kind: WorkshopKind) => {
     engine.dispatchAction("workshop-place", { kind });
   };
+  const pointerToViewBox = (event: React.PointerEvent<SVGSVGElement> | React.PointerEvent<SVGGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const r = svg.getBoundingClientRect();
+    return {
+      x: ((event.clientX - r.left) / r.width) * CANVAS_W,
+      y: ((event.clientY - r.top) / r.height) * CANVAS_H,
+    };
+  };
   const clickWorkshopNode = (id: string) => {
-    if (cableMode) {
+    if (tool === "remove") {
+      engine.dispatchAction("workshop-remove", { id });
+      if (sel === id) setSel(null);
+      if (cableFrom === id) setCableFrom(null);
+      return;
+    }
+    if (tool === "cable") {
       if (!cableFrom) {
         setCableFrom(id);
         setSel(id);
@@ -108,6 +132,12 @@ export default function NetworkApp() {
     }
     setSel(sel === id ? null : id);
   };
+  const openConsole = (id: string) => {
+    engine.selectTerminalHost(id);
+    engine.openApp("terminal");
+    engine.focusWindow("terminal");
+  };
+  const e5Locked = state.activeMissionId?.startsWith("e5_") ?? false;
 
   return (
     <div className="flex h-full flex-col">
@@ -135,7 +165,7 @@ export default function NetworkApp() {
         <div className="hz-network-layout">
           <div className="hz-network-map">
             <div className="absolute left-2 right-2 top-2 z-10 flex flex-wrap items-center gap-1">
-              {(["pfsense", "switch", "server", "pc", "ap"] as WorkshopKind[]).map((kind) => (
+              {WORKSHOP_CATALOG.map((kind) => (
                 <button
                   key={kind}
                   type="button"
@@ -149,64 +179,146 @@ export default function NetworkApp() {
               <button
                 type="button"
                 data-testid="workshop-cable"
-                className={`hz-btn px-2 py-1 text-[11px] ${cableMode ? "hz-btn-primary" : "hz-btn-ghost"}`}
+                className={`hz-btn px-2 py-1 text-[11px] ${tool === "cable" ? "hz-btn-primary" : "hz-btn-ghost"}`}
                 onClick={() => {
-                  setCableMode((v) => !v);
+                  setTool((v) => (v === "cable" ? "select" : "cable"));
                   setCableFrom(null);
                 }}
               >
                 {t("workshop.cable")}
               </button>
+              <button
+                type="button"
+                data-testid="workshop-remove"
+                className={`hz-btn px-2 py-1 text-[11px] ${tool === "remove" ? "hz-btn-primary" : "hz-btn-ghost"}`}
+                onClick={() => {
+                  setTool((v) => (v === "remove" ? "select" : "remove"));
+                  setCableFrom(null);
+                }}
+              >
+                {t("workshop.remove")}
+              </button>
+              <button
+                type="button"
+                data-testid="workshop-clear"
+                className="hz-btn hz-btn-ghost px-2 py-1 text-[11px]"
+                disabled={e5Locked}
+                onClick={() => {
+                  engine.dispatchAction("workshop-clear");
+                  setSel(null);
+                  setCableFrom(null);
+                }}
+              >
+                {t("workshop.clear")}
+              </button>
             </div>
-            <svg viewBox="0 0 800 400" className="h-full w-full" aria-label={t("workshop.tab")} data-testid="workshop-map">
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+              className="h-full w-full"
+              aria-label={t("workshop.tab")}
+              data-testid="workshop-map"
+            >
               {ws.links.map(([a, b]) => {
-                const na = ws.nodes.find((n) => n.id === a);
-                const nb = ws.nodes.find((n) => n.id === b);
+                const na = nodePos(a);
+                const nb = nodePos(b);
                 if (!na || !nb) return null;
                 return (
-                  <line
-                    key={`${a}-${b}`}
-                    x1={na.x}
-                    y1={na.y}
-                    x2={nb.x}
-                    y2={nb.y}
-                    stroke="rgba(53,224,210,0.4)"
-                    strokeWidth={2}
-                  />
+                  <g key={`${a}-${b}`} data-testid={`workshop-link-${a}-${b}`}>
+                    <line
+                      x1={na.x}
+                      y1={na.y}
+                      x2={nb.x}
+                      y2={nb.y}
+                      stroke="transparent"
+                      strokeWidth={12}
+                      className="cursor-pointer"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        engine.dispatchAction("workshop-uncable", { a, b });
+                      }}
+                    />
+                    <line
+                      x1={na.x}
+                      y1={na.y}
+                      x2={nb.x}
+                      y2={nb.y}
+                      stroke="rgba(53,224,210,0.4)"
+                      strokeWidth={2}
+                      pointerEvents="none"
+                    />
+                  </g>
                 );
               })}
               {ws.nodes.map((n) => {
                 const h = state.world.hosts[n.id];
                 const up = h ? hostUp(h) : false;
                 const active = sel === n.id || cableFrom === n.id;
+                const pos = draftPos[n.id] ?? n;
                 return (
                   <g
                     key={n.id}
-                    transform={`translate(${n.x},${n.y})`}
-                    className="cursor-pointer"
+                    transform={`translate(${pos.x},${pos.y})`}
+                    className={tool === "select" ? "cursor-grab" : "cursor-pointer"}
                     data-testid={`workshop-node-${n.id}`}
-                    onClick={() => clickWorkshopNode(n.id)}
+                    onPointerDown={(event) => {
+                      if (tool !== "select") return;
+                      event.stopPropagation();
+                      const p = pointerToViewBox(event);
+                      dragRef.current = { id: n.id, dx: p.x - pos.x, dy: p.y - pos.y, moved: false, x: pos.x, y: pos.y };
+                      (event.currentTarget as SVGGElement).setPointerCapture(event.pointerId);
+                    }}
+                    onPointerMove={(event) => {
+                      const drag = dragRef.current;
+                      if (!drag || drag.id !== n.id || tool !== "select") return;
+                      const p = pointerToViewBox(event);
+                      const x = p.x - drag.dx;
+                      const y = p.y - drag.dy;
+                      if (!drag.moved && Math.abs(x - pos.x) < 3 && Math.abs(y - pos.y) < 3) return;
+                      drag.moved = true;
+                      drag.x = x;
+                      drag.y = y;
+                      setDraftPos((prev) => ({ ...prev, [drag.id]: { x, y } }));
+                    }}
+                    onPointerUp={() => {
+                      const drag = dragRef.current;
+                      if (!drag || drag.id !== n.id) return;
+                      if (!drag.moved) clickWorkshopNode(drag.id);
+                      else {
+                        engine.dispatchAction("workshop-move", { id: drag.id, x: drag.x, y: drag.y });
+                        setSel(drag.id);
+                      }
+                      setDraftPos({});
+                      dragRef.current = null;
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (tool !== "select") clickWorkshopNode(n.id);
+                    }}
                   >
                     <rect
-                      x={-36}
-                      y={-22}
-                      width={72}
-                      height={44}
+                      x={-42}
+                      y={-24}
+                      width={84}
+                      height={48}
                       rx={9}
                       fill={active ? "rgba(53,224,210,0.18)" : "rgba(13,20,36,0.92)"}
                       stroke={active ? "var(--color-hz-accent)" : "var(--color-hz-border)"}
                       strokeWidth={active ? 1.8 : 1.2}
                     />
-                    <text textAnchor="middle" y={-2} fontSize={11} fill={up ? "var(--color-hz-text)" : "var(--color-hz-muted)"} fontWeight={600}>
+                    <text textAnchor="middle" y={-2} fontSize={10} fill={up ? "var(--color-hz-text)" : "var(--color-hz-muted)"} fontWeight={600}>
                       {n.id}
                     </text>
-                    <circle cx={28} cy={-14} r={4} fill={up ? "var(--color-hz-green)" : "var(--color-hz-amber)"} />
+                    <text textAnchor="middle" y={12} fontSize={8} fill="var(--color-hz-muted)">
+                      {t(`workshop.kind.${n.kind}`)}
+                    </text>
+                    <circle cx={32} cy={-16} r={4} fill={up ? "var(--color-hz-green)" : "var(--color-hz-amber)"} />
                   </g>
                 );
               })}
             </svg>
-            <div className="pointer-events-none absolute bottom-2 left-3 text-[10.5px] text-hz-muted">
-              {cableMode ? t("workshop.cableHint") : t("workshop.hint")}
+            <div className="pointer-events-none absolute bottom-2 left-3 right-3 text-[10.5px] text-hz-muted">
+              {tool === "cable" ? t("workshop.cableHint") : tool === "remove" ? t("workshop.removeHint") : t("workshop.hint")}
             </div>
           </div>
           <div className="hz-network-details">
@@ -222,11 +334,33 @@ export default function NetworkApp() {
                     </div>
                   </div>
                 ))}
+                <div className="mt-3 flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    data-testid="workshop-console"
+                    className="hz-btn hz-btn-primary px-2 py-1 text-[11px]"
+                    onClick={() => sel && openConsole(sel)}
+                  >
+                    {t("workshop.console")}
+                  </button>
+                  <button
+                    type="button"
+                    className="hz-btn hz-btn-ghost px-2 py-1 text-[11px]"
+                    onClick={() => {
+                      if (!sel) return;
+                      engine.dispatchAction("workshop-remove", { id: sel });
+                      setSel(null);
+                    }}
+                  >
+                    {t("workshop.remove")}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex h-40 flex-col items-center justify-center text-center text-hz-muted">
                 <Icon name="layers" size={26} className="mb-2 opacity-40" />
                 <p className="text-[12px]">{t("workshop.empty")}</p>
+                <p className="mt-2 px-2 text-[10.5px]">{t("workshop.sandbox")}</p>
               </div>
             )}
           </div>

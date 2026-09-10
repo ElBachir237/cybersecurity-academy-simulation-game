@@ -1,4 +1,6 @@
-// Atelier architecture palier 1 — rack isolé (LAB-*), pas le siège HQ.
+// Atelier architecture — rack isolé (LAB-*), pas le siège HQ.
+// Palier 1 (ch. 7) : IDs canoniques LAB-FW / LAB-SW / LAB-WEB / LAB-PC / LAB-AP.
+// Bac à sable GNS : plusieurs instances, MikroTik / UDM / caméras, déplacement.
 import type { GameState, GameWorld, HostRuntime } from "../types";
 
 export const LAB_FW = "LAB-FW";
@@ -12,7 +14,31 @@ export const LAB_GW_IP = "10.20.0.1";
 export const LAB_WEB_IP = "10.20.0.20";
 export const LAB_PC_IP = "10.20.0.24";
 
-export type WorkshopKind = "pfsense" | "switch" | "server" | "pc" | "ap";
+export const CANVAS_W = 1100;
+export const CANVAS_H = 620;
+
+export type WorkshopKind =
+  | "pfsense"
+  | "switch"
+  | "server"
+  | "pc"
+  | "ap"
+  | "mikrotik"
+  | "unifi_gw"
+  | "camera";
+
+export const WORKSHOP_CATALOG: WorkshopKind[] = [
+  "pfsense",
+  "mikrotik",
+  "unifi_gw",
+  "switch",
+  "server",
+  "pc",
+  "ap",
+  "camera",
+];
+
+export const TIER1_KINDS: WorkshopKind[] = ["pfsense", "switch", "server", "pc", "ap"];
 
 export interface WorkshopNode {
   id: string;
@@ -32,15 +58,25 @@ export const WORKSHOP_KIND_IDS: Record<WorkshopKind, string> = {
   server: LAB_WEB,
   pc: LAB_PC,
   ap: LAB_AP,
+  mikrotik: "LAB-MT",
+  unifi_gw: "LAB-UDM",
+  camera: "LAB-CAM",
 };
 
 const KIND_LAYOUT: Record<WorkshopKind, { x: number; y: number }> = {
-  pfsense: { x: 400, y: 70 },
-  switch: { x: 400, y: 190 },
-  server: { x: 220, y: 310 },
-  pc: { x: 580, y: 310 },
-  ap: { x: 720, y: 190 },
+  pfsense: { x: 400, y: 80 },
+  switch: { x: 400, y: 230 },
+  server: { x: 220, y: 400 },
+  pc: { x: 580, y: 400 },
+  ap: { x: 760, y: 230 },
+  mikrotik: { x: 160, y: 80 },
+  unifi_gw: { x: 640, y: 80 },
+  camera: { x: 920, y: 400 },
 };
+
+export function isWorkshopKind(value: unknown): value is WorkshopKind {
+  return typeof value === "string" && value in WORKSHOP_KIND_IDS;
+}
 
 export function emptyWorkshop(): WorkshopState {
   return { nodes: [], links: [] };
@@ -95,14 +131,26 @@ export function workshopConnected(a: string, b: string, state: GameState): boole
   return false;
 }
 
-function makeHost(kind: WorkshopKind): HostRuntime {
-  const id = WORKSHOP_KIND_IDS[kind];
+function kindLabel(kind: WorkshopKind, id: string): string {
+  if (kind === "pfsense") return `${id} — pfSense (atelier)`;
+  if (kind === "switch") return `${id} — Switch L2 (atelier)`;
+  if (kind === "server") return `${id} — Serveur web (atelier)`;
+  if (kind === "ap") return `${id} — UniFi AP (atelier)`;
+  if (kind === "mikrotik") return `${id} — MikroTik (atelier)`;
+  if (kind === "unifi_gw") return `${id} — UniFi Dream Machine (atelier)`;
+  if (kind === "camera") return `${id} — Caméra (atelier)`;
+  return `${id} — Poste de test (atelier)`;
+}
+
+function makeHost(kind: WorkshopKind, id: string): HostRuntime {
+  const label = kindLabel(kind, id);
+  const room = "Atelier architecture";
   if (kind === "pfsense") {
     return {
       id,
-      label: "LAB-FW — pfSense (atelier)",
+      label,
       os: "pfSense 2.7.2",
-      room: "Atelier architecture",
+      room,
       ifaces: {
         em0: { state: "up", dhcp: false },
         em1: { state: "up", dhcp: false },
@@ -115,9 +163,9 @@ function makeHost(kind: WorkshopKind): HostRuntime {
   if (kind === "switch") {
     return {
       id,
-      label: "LAB-SW — Switch L2 (atelier)",
+      label,
       os: "HP ProCurve (L2)",
-      room: "Atelier architecture",
+      room,
       ifaces: {
         vlan: { state: "up", dhcp: false },
       },
@@ -129,9 +177,9 @@ function makeHost(kind: WorkshopKind): HostRuntime {
   if (kind === "server") {
     return {
       id,
-      label: "LAB-WEB — Serveur web (atelier)",
+      label,
       os: "Debian 12",
-      room: "Atelier architecture",
+      room,
       ifaces: {
         eth0: { state: "up", dhcp: false },
       },
@@ -143,9 +191,9 @@ function makeHost(kind: WorkshopKind): HostRuntime {
   if (kind === "ap") {
     return {
       id,
-      label: "LAB-AP — UniFi AP (atelier)",
+      label,
       os: "UniFi AP",
-      room: "Atelier architecture",
+      room,
       ifaces: {
         eth0: { state: "up", dhcp: false },
       },
@@ -155,11 +203,58 @@ function makeHost(kind: WorkshopKind): HostRuntime {
       logs: ["Sep 12 lab: AP waiting for uplink"],
     };
   }
+  if (kind === "mikrotik") {
+    return {
+      id,
+      label,
+      os: "MikroTik RouterOS 7.14",
+      room,
+      ifaces: {
+        ether1: { state: "up", dhcp: false },
+        ether2: { state: "up", dhcp: false },
+      },
+      dns: [],
+      services: {},
+      routes: [],
+      nat: [],
+      logs: ["Sep 12 lab: RouterOS factory default"],
+    };
+  }
+  if (kind === "unifi_gw") {
+    return {
+      id,
+      label,
+      os: "UniFi Dream Machine",
+      room,
+      ifaces: {
+        wan: { state: "up", dhcp: false },
+        lan: { state: "up", dhcp: false },
+      },
+      dns: [],
+      services: {},
+      guestIsolation: false,
+      logs: ["Sep 12 lab: UDM factory default"],
+    };
+  }
+  if (kind === "camera") {
+    return {
+      id,
+      label,
+      os: "Axis Camera (simulation)",
+      room,
+      ifaces: {
+        eth0: { state: "up", dhcp: false },
+      },
+      dns: [],
+      services: { rtsp: "active" },
+      logs: ["Sep 12 lab: camera waiting for VLAN"],
+    };
+  }
   return {
     id,
-    label: "LAB-PC — Poste de test (atelier)",
+    label,
     os: "Ubuntu 22.04 LTS",
-    room: "Atelier architecture",
+    room,
     ifaces: {
       eth0: { state: "up", dhcp: false },
     },
@@ -169,16 +264,58 @@ function makeHost(kind: WorkshopKind): HostRuntime {
   };
 }
 
-export function placeWorkshopDevice(world: GameWorld, kind: WorkshopKind): { ok: boolean; id?: string; reason?: string } {
+function idTaken(world: GameWorld, id: string): boolean {
   const ws = ensureWorkshop(world);
-  const id = WORKSHOP_KIND_IDS[kind];
-  if (ws.nodes.some((n) => n.id === id) || world.hosts[id]) {
-    return { ok: false, id, reason: "already" };
-  }
-  const layout = KIND_LAYOUT[kind];
-  world.hosts[id] = makeHost(kind);
+  return !!world.hosts[id] || ws.nodes.some((n) => n.id === id);
+}
+
+function nextWorkshopId(world: GameWorld, kind: WorkshopKind): string {
+  const canonical = WORKSHOP_KIND_IDS[kind];
+  if (!idTaken(world, canonical)) return canonical;
+  let i = 2;
+  while (idTaken(world, `${canonical}-${i}`)) i += 1;
+  return `${canonical}-${i}`;
+}
+
+function clampPos(x: number, y: number): { x: number; y: number } {
+  return {
+    x: Math.max(48, Math.min(CANVAS_W - 48, Math.round(x))),
+    y: Math.max(40, Math.min(CANVAS_H - 40, Math.round(y))),
+  };
+}
+
+function defaultPos(ws: WorkshopState, kind: WorkshopKind): { x: number; y: number } {
+  const base = KIND_LAYOUT[kind];
+  const n = ws.nodes.filter((node) => node.kind === kind).length;
+  return clampPos(base.x + n * 44, base.y + n * 32);
+}
+
+export function placeWorkshopDevice(
+  world: GameWorld,
+  kind: WorkshopKind,
+  pos?: { x: number; y: number }
+): { ok: boolean; id?: string; reason?: string } {
+  const ws = ensureWorkshop(world);
+  const id = nextWorkshopId(world, kind);
+  const layout = pos ? clampPos(pos.x, pos.y) : defaultPos(ws, kind);
+  world.hosts[id] = makeHost(kind, id);
   ws.nodes = [...ws.nodes, { id, kind, x: layout.x, y: layout.y }];
   return { ok: true, id };
+}
+
+export function moveWorkshopDevice(world: GameWorld, id: string, x: number, y: number): void {
+  if (!isLabHost(id)) return;
+  const ws = ensureWorkshop(world);
+  const pos = clampPos(x, y);
+  ws.nodes = ws.nodes.map((n) => (n.id === id ? { ...n, x: pos.x, y: pos.y } : n));
+}
+
+export function removeWorkshopDevice(world: GameWorld, id: string): void {
+  if (!isLabHost(id)) return;
+  delete world.hosts[id];
+  const ws = ensureWorkshop(world);
+  ws.nodes = ws.nodes.filter((n) => n.id !== id);
+  ws.links = ws.links.filter(([a, b]) => a !== id && b !== id);
 }
 
 export function cableWorkshop(world: GameWorld, a: string, b: string): { ok: boolean; reason?: string } {
@@ -248,8 +385,9 @@ export function stripLabAddressing(world: GameWorld): void {
 }
 
 export function ensureBuiltRack(world: GameWorld): void {
-  for (const kind of ["pfsense", "switch", "server", "pc", "ap"] as WorkshopKind[]) {
-    placeWorkshopDevice(world, kind);
+  for (const kind of TIER1_KINDS) {
+    const id = WORKSHOP_KIND_IDS[kind];
+    if (!world.hosts[id]) placeWorkshopDevice(world, kind);
   }
   for (const [a, b] of REQUIRED_CABLES) {
     cableWorkshop(world, a, b);
@@ -273,8 +411,12 @@ export function applyWorkshopAction(
   payload?: Record<string, unknown>
 ): void {
   if (action === "workshop-place") {
-    const kind = payload?.kind as WorkshopKind | undefined;
-    if (kind && kind in WORKSHOP_KIND_IDS) placeWorkshopDevice(state.world, kind);
+    const kind = payload?.kind;
+    if (!isWorkshopKind(kind)) return;
+    const x = Number(payload?.x);
+    const y = Number(payload?.y);
+    const pos = Number.isFinite(x) && Number.isFinite(y) ? { x, y } : undefined;
+    placeWorkshopDevice(state.world, kind, pos);
     return;
   }
   if (action === "workshop-cable") {
@@ -287,5 +429,22 @@ export function applyWorkshopAction(
     const a = String(payload?.a ?? "");
     const b = String(payload?.b ?? "");
     if (a && b) uncableWorkshop(state.world, a, b);
+    return;
+  }
+  if (action === "workshop-move") {
+    const id = String(payload?.id ?? "");
+    const x = Number(payload?.x);
+    const y = Number(payload?.y);
+    if (id && Number.isFinite(x) && Number.isFinite(y)) moveWorkshopDevice(state.world, id, x, y);
+    return;
+  }
+  if (action === "workshop-remove") {
+    const id = String(payload?.id ?? "");
+    if (id) removeWorkshopDevice(state.world, id);
+    return;
+  }
+  if (action === "workshop-clear") {
+    if (state.activeMissionId?.startsWith("e5_")) return;
+    clearWorkshop(state.world);
   }
 }

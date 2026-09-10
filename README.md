@@ -149,6 +149,8 @@ Réussir le chapitre débloque le certificat **Network Administrator**.
 
 Rack isolé (`LAB-*`), pas le siège. App **Réseau → Atelier** : on **place** pfSense / switch / serveur / PC / AP, on **câble** via le switch, on **adresse** `10.20.0.0/24`, on **publie** `lab.horizon.local` (curl depuis `LAB-PC`).
 
+**Bac à sable GNS** (même onglet, après le ch. 6) : tu **poses** autant de boîtes que tu veux (pfSense, MikroTik, UDM, switch, serveur, PC, AP, caméra), tu **glisses**, tu **câbles** / **débranches**, tu **retires**, tu ouvres la **console** sur l’équipement. Le premier de chaque kind palier 1 garde l’ID canonique (`LAB-FW`, …) pour les missions `e5_*`.
+
 | Mission | Type | Sujet |
 | --- | --- | --- |
 | **Le rack vide** (`e5_lab`) | Lab | Placer 5 boîtes, câbler en étoile sur `LAB-SW` ; skip switch = erreur |
@@ -361,6 +363,8 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Atelier architecture — palier 1 (`released`) :** tu **places** un pfSense, un switch, un AP UniFi, un serveur web, un PC de test ; tu câbles via le switch ; tu adresses `10.20.0.0/24` ; `lab.horizon.local` répond au curl.
 
+**Bac à sable GNS (`released`) :** même atelier, mode libre — catalogue étendu (MikroTik, UDM, caméras), plusieurs instances, drag-drop, débranchement, console. Les missions 5★ câblées restent un palier suivant.
+
 ### Chapitre 8 — SOC L1 (`released`)
 
 **But :** porte d’entrée cyber. File d’alertes, SIEM, phishing, faux positif, escalation **dans le temps imparti**.
@@ -445,7 +449,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E7** | Co-op 2 joueurs (helpdesk + SOC) + vue formateur | Travail en équipe |
 | **E8** | Ch. 9–11 (L2, IR, DFIR) dans l'ordre | **Fait** |
 | **E9** | Ch. 12–13 VITRINE + ORBIT (web défense, cloud HORIZON) | **Fait** |
-| **E10** | Ch. 14 BASTION (ops) ; atelier palier 2–3 5★ | Ops **fait** ; atelier 5★ à venir |
+| **E10** | Ch. 14 BASTION (ops) ; atelier palier 2–3 5★ | Ops **fait** ; bac à sable GNS **fait** ; missions 5★ à venir |
 | **E11** | Ch. 15–16 MANDAT + capstone APOGEE | **Fait** |
 
 **Prochaine implémentation :** co-op (E7) et atelier 5★. La campagne solo 1–16 est jouable.
@@ -616,7 +620,7 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
 | Moteur + terminal | Solide pour les ch. 1–16 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier, SIEM, EDR / IOC, DFIR, nginx AppSec, hzcloud, bastion/ZT, hzpolicy) |
 | Contenu jouable | Chapitres 1–16 (labs + tickets + exams à variantes + atelier palier 1 + SOC L1/L2 + IR + DFIR + VITRINE + ORBIT + BASTION + MANDAT + APOGEE) |
-| Curriculum carrière (atelier 5★, co-op) | Vision écrite, pas encore jouable |
+| Curriculum carrière (atelier 5★, co-op) | Bac à sable GNS jouable ; missions 5★ et co-op encore en vision |
 | SOC L1–L2, IR, DFIR, AppSec, cloud, archi, GRC, capstone, certificats serveur, classe | File SIEM + sandbox/EDR + timeline + ops légende + capstone jouables ; co-op à venir |
 | Auth, CI, docs produit | À faire |
 

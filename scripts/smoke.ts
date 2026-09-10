@@ -1944,6 +1944,47 @@ console.log("\n[40] OLD SAVE — missing e5_lab runtime still starts after chapt
   assert(Array.isArray(e.state.world.workshop?.nodes), "workshop hydrated");
 }
 
+console.log("\n[40b] WORKSHOP SANDBOX GNS");
+{
+  const e = completeChapter6Ready();
+  e.dispatchAction("workshop-place", { kind: "mikrotik" });
+  assert(!!e.state.world.hosts["LAB-MT"], "first mikrotik is LAB-MT");
+  assert(e.state.world.hosts["LAB-MT"]?.os.includes("RouterOS"), "RouterOS on lab mikrotik");
+  e.dispatchAction("workshop-place", { kind: "pc" });
+  assert(!!e.state.world.hosts["LAB-PC"], "first pc is LAB-PC");
+  e.dispatchAction("workshop-place", { kind: "pc" });
+  assert(!!e.state.world.hosts["LAB-PC-2"], "second pc is LAB-PC-2");
+  e.dispatchAction("workshop-place", { kind: "camera" });
+  e.dispatchAction("workshop-place", { kind: "unifi_gw" });
+  assert(!!e.state.world.hosts["LAB-CAM"], "camera placed");
+  assert(e.state.world.hosts["LAB-UDM"]?.os.includes("Dream Machine"), "UDM placed");
+  e.dispatchAction("workshop-cable", { a: "LAB-MT", b: "LAB-PC" });
+  assert(
+    (e.state.world.workshop?.links ?? []).some(([a, b]) => a === "LAB-MT" && b === "LAB-PC"),
+    "sandbox cable stored"
+  );
+  e.dispatchAction("workshop-move", { id: "LAB-MT", x: 200, y: 120 });
+  const moved = e.state.world.workshop?.nodes.find((n) => n.id === "LAB-MT");
+  assert(moved?.x === 200 && moved?.y === 120, "device moved");
+  e.dispatchAction("workshop-uncable", { a: "LAB-MT", b: "LAB-PC" });
+  assert(
+    !(e.state.world.workshop?.links ?? []).some(([a, b]) => a === "LAB-MT" || b === "LAB-MT"),
+    "sandbox uncable"
+  );
+  e.dispatchAction("workshop-remove", { id: "LAB-PC-2" });
+  assert(!e.state.world.hosts["LAB-PC-2"], "extra pc removed");
+  assert(!!e.state.world.hosts["LAB-PC"], "canonical pc kept");
+  e.dispatchAction("workshop-clear");
+  assert(!e.state.world.hosts["LAB-MT"] && (e.state.world.workshop?.nodes.length ?? 0) === 0, "sandbox cleared");
+  e.startMission("e5_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  assert(!e.state.world.hosts["LAB-FW"], "e5_lab still empties the rack");
+  e.dispatchAction("workshop-place", { kind: "pfsense" });
+  assert(e.state.world.hosts["LAB-FW"]?.id === "LAB-FW", "first pfsense remains LAB-FW");
+  e.dispatchAction("workshop-clear");
+  assert(!!e.state.world.hosts["LAB-FW"], "clear blocked during e5_lab");
+}
+
 console.log("\n[41] CHAPTER 8 LAB e6_lab");
 {
   const e = completeChapter7Ready();

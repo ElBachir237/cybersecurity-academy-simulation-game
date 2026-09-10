@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { profiles, saves } from "@/db/schema";
-import { SAVE_VERSION } from "@/game/engine";
+import { SAVE_VERSION } from "@/game/save-version";
 
 export const dynamic = "force-dynamic";
 

@@ -58,10 +58,11 @@ import {
   createWorkspace, restoreWorkspace, normalizeWindowLayout, defaultWindowLayout,
   trimTerminalBlocks, type WindowLayout, type TerminalBlock,
 } from "./workspace";
+import { SAVE_VERSION } from "./save-version";
+
+export { SAVE_VERSION };
 
 export interface SaveOutcome { local: boolean; remote: boolean; savedAt: number }
-
-export const SAVE_VERSION = 3;
 const LOCAL_KEY = "horizon-save-v3";
 
 const DHCP_LEASES: Record<string, [string, number, string]> = {
@@ -1000,65 +1001,61 @@ export class GameEngine {
   }
 
   private openMissionWorkspace(def: MissionDef): void {
-    if (def.id === "c2_lab" || def.id.startsWith("e5_")) {
+    const id = def.id;
+    const isLab = id.endsWith("_lab");
+    if (id === "c2_lab" || id.startsWith("e5_")) {
       this.openApp("network");
-      if (def.id !== "c2_lab") this.openApp("terminal");
+      if (id !== "c2_lab") this.openApp("terminal");
       return;
     }
     if (
-      def.id.startsWith("e6_") ||
-      def.id.startsWith("e7_") ||
-      def.id.startsWith("e8_") ||
-      def.id.startsWith("e9_")
+      id.startsWith("e6_") ||
+      id.startsWith("e7_") ||
+      id.startsWith("e8_") ||
+      id.startsWith("e9_") ||
+      id.startsWith("e14_")
     ) {
       this.openApp("soc");
       this.openApp("terminal");
-      if (!def.id.endsWith("_lab")) this.openApp("mail");
+      if (!isLab) this.openApp("mail");
       this.focusWindow("soc");
       return;
     }
-    if (def.id.startsWith("e10_")) {
+    if (id.startsWith("e10_")) {
       this.openApp("browser");
       this.openApp("terminal");
-      if (!def.id.endsWith("_lab")) this.openApp("mail");
+      if (!isLab) this.openApp("mail");
       this.focusWindow("terminal");
       return;
     }
-    if (def.id.startsWith("e11_")) {
+    if (id.startsWith("e11_")) {
       this.openApp("terminal");
-      if (!def.id.endsWith("_lab")) this.openApp("mail");
+      if (!isLab) this.openApp("mail");
       this.focusWindow("terminal");
       return;
     }
-    if (def.id.startsWith("e12_")) {
+    if (id.startsWith("e12_")) {
       this.openApp("network");
       this.openApp("terminal");
-      if (!def.id.endsWith("_lab")) this.openApp("mail");
+      if (!isLab) this.openApp("mail");
       this.focusWindow("network");
       return;
     }
-    if (def.id.startsWith("e13_")) {
+    if (id.startsWith("e13_")) {
       this.openApp("mail");
       this.openApp("chat");
       this.openApp("terminal");
-      this.focusWindow(def.id.endsWith("_lab") ? "terminal" : "mail");
+      this.focusWindow(isLab ? "terminal" : "mail");
       return;
     }
-    if (def.id.startsWith("e14_")) {
-      this.openApp("soc");
-      this.openApp("terminal");
-      if (!def.id.endsWith("_lab")) this.openApp("mail");
-      this.focusWindow("soc");
-      return;
-    }
-    if (def.id === "c5_web" || def.id === "c5_sim") {
+    if (id === "c5_web" || id === "c5_sim") {
       this.openApp("mail");
       this.openApp("browser");
       this.openApp("terminal");
       this.focusWindow("mail");
       return;
     }
-    if (def.kind === "lab") {
+    if (isLab) {
       this.openApp("terminal");
       return;
     }
