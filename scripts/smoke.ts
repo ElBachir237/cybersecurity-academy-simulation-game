@@ -497,6 +497,61 @@ function completeC5Ad(e: GameEngine) {
   e.sendChat("itsupport", "compte jmorel cree");
 }
 
+function completeC5Sim(e: GameEngine) {
+  e.startMission("c5_sim", "nginx");
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c5_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  run(e, "SRV-WEB", "sudo systemctl start nginx");
+  run(e, "WS-001", "curl intranet.horizon");
+  e.sendChat("itsupport", "rapport: incident systemes clos");
+}
+
+function completeChapter5Ready(): GameEngine {
+  const e = completeChapter4Ready();
+  completeC5Lab(e);
+  completeC5Web(e);
+  completeC5Ad(e);
+  completeC5Sim(e);
+  return e;
+}
+
+function completeC6Lab(e: GameEngine) {
+  e.startMission("c6_lab");
+  run(e, "FW-PFS", "help");
+  run(e, "FW-PFS", "pfctl -sr");
+  run(e, "FW-PFS", "easyrule delete wan PF-HOLE");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+}
+
+function completeC6Mt(e: GameEngine) {
+  e.startMission("c6_mt");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.c6_mt.mailTicketSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "RTR-BR", "/ip address print");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "RTR-BR", "/ip route print");
+  run(e, "RTR-BR", "/ip route add dst-address=0.0.0.0/0 gateway=172.16.0.1");
+  run(e, "RTR-BR", "/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade");
+  run(e, "PC-LEA", "ping 10.0.0.20");
+  e.sendChat("itsupport", "filiale retablie");
+}
+
+function completeC6Unifi(e: GameEngine) {
+  e.startMission("c6_unifi");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.c6_unifi.mailTicketSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "GW-UDM", "info");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "GW-UDM", "show firewall");
+  run(e, "GW-UDM", "set-guest-isolation on");
+  run(e, "PC-PAUL", "ping 192.168.10.24");
+  e.sendChat("itsupport", "isolation guest on");
+}
+
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
 {
   const e = newEngine();
@@ -1199,6 +1254,180 @@ console.log("\n[31] OLD SAVE — missing c5_lab runtime still starts after chapt
   assert(e.state.activeMissionId === "c5_lab", "c5_lab starts from a save that lacked chapter 5 runtimes");
   assert(e.state.world.hosts["SRV-DC"]?.os.includes("Samba"), "SRV-DC hydrated onto old save");
   assert(Array.isArray(Object.keys(e.state.world.directory ?? {})), "directory hydrated");
+}
+
+console.log("\n[32] CHAPTER 6 LAB c6_lab");
+{
+  const e = completeChapter5Ready();
+  assert(e.state.missions["c6_lab"].status === "available", "c6_lab unlocked after chapter 5");
+  e.startMission("c6_lab");
+  assert(e.state.world.fwRules.some((r) => r.id === "PF-HOLE"), "PF-HOLE present at lab start");
+  const listed = run(e, "FW-PFS", "pfctl -sr").join("\n");
+  assert(listed.includes("PF-HOLE"), "pfctl -sr shows PF-HOLE");
+  const leak = run(e, "WS-001", "ping 192.168.20.45").join("\n");
+  assert(noLoss(leak), "Finance reachable while hole is open");
+  run(e, "FW-PFS", "easyrule delete wan PF-HOLE");
+  assert(!e.state.world.fwRules.some((r) => r.id === "PF-HOLE"), "PF-HOLE deleted");
+  const closed = run(e, "WS-001", "ping 192.168.20.45").join("\n");
+  assert(allLoss(closed) || closed.toLowerCase().includes("filter") || closed.toLowerCase().includes("timeout"), "Finance blocked after delete");
+  const dns = run(e, "WS-001", "ping 10.0.0.10").join("\n");
+  assert(noLoss(dns), "DNS still reachable");
+  assert(e.state.missions["c6_lab"].status === "completed", "c6_lab completed");
+  assert(e.state.missions["c6_mt"].status === "available", "c6_mt unlocked");
+}
+
+console.log("\n[33] CHAPTER 6 MISSION c6_mt");
+{
+  const e = completeChapter5Ready();
+  completeC6Lab(e);
+  e.startMission("c6_mt");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c6_mt.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  const before = run(e, "PC-LEA", "ping 10.0.0.20").join("\n");
+  assert(
+    before.toLowerCase().includes("no-route") || allLoss(before) || before.toLowerCase().includes("unreachable") || before.toLowerCase().includes("échec") || before.toLowerCase().includes("echec"),
+    "branch intranet down before route/NAT"
+  );
+  run(e, "RTR-BR", "/ip address print");
+  assert(e.state.pendingDecision?.id === "c6m_nat", "skip NAT decision shown");
+  e.answerDecision("B");
+  run(e, "RTR-BR", "/ip route print");
+  run(e, "RTR-BR", "/ip route add dst-address=0.0.0.0/0 gateway=172.16.0.1");
+  run(e, "RTR-BR", "/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade");
+  const after = run(e, "PC-LEA", "ping 10.0.0.20").join("\n");
+  assert(noLoss(after), "intranet reachable from PC-LEA after route+NAT");
+  e.sendChat("itsupport", "filiale retablie ping 10.0.0.20");
+  assert(e.state.missions["c6_mt"].status === "completed", "c6_mt completed");
+  assert(e.state.badges.includes("vendor_net"), "badge vendor_net");
+  assert(e.state.missions["c6_unifi"].status === "available", "c6_unifi unlocked");
+}
+
+console.log("\n[33b] CHAPTER 6 ERROR — skip NAT");
+{
+  const e = completeChapter5Ready();
+  completeC6Lab(e);
+  e.startMission("c6_mt");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c6_mt.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "RTR-BR", "/ip address print");
+  assert(e.state.pendingDecision?.id === "c6m_nat", "NAT decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["c6_mt"].errorKeys.includes("skip_nat"), "skip_nat recorded");
+  run(e, "RTR-BR", "/ip route add dst-address=0.0.0.0/0 gateway=172.16.0.1");
+  run(e, "RTR-BR", "/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade");
+  run(e, "PC-LEA", "ping 10.0.0.20");
+  e.sendChat("itsupport", "filiale ok malgre tout");
+  assert(e.state.missions["c6_mt"].status === "completed", "still completable");
+  assert(e.state.missions["c6_mt"].score < 100, "score penalized");
+}
+
+console.log("\n[34] CHAPTER 6 MISSION c6_unifi");
+{
+  const e = completeChapter5Ready();
+  completeC6Lab(e);
+  completeC6Mt(e);
+  e.startMission("c6_unifi");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c6_unifi.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  const leak = run(e, "PC-PAUL", "ping 192.168.10.24").join("\n");
+  assert(noLoss(leak), "guest leaks to office before isolation");
+  run(e, "GW-UDM", "info");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "GW-UDM", "show firewall");
+  run(e, "GW-UDM", "set-guest-isolation on");
+  assert(!e.state.world.fwRules.some((r) => r.id === "GUEST-LAN"), "GUEST-LAN removed");
+  const isolated = run(e, "PC-PAUL", "ping 192.168.10.24").join("\n");
+  assert(allLoss(isolated) || isolated.toLowerCase().includes("filter") || isolated.toLowerCase().includes("timeout"), "guest no longer reaches office");
+  const dns = run(e, "WS-001", "ping 10.0.0.10").join("\n");
+  assert(noLoss(dns), "office DNS intact");
+  e.sendChat("itsupport", "isolation guest on");
+  assert(e.state.missions["c6_unifi"].status === "completed", "c6_unifi completed");
+  assert(e.state.missions["c6_sim"].status === "available", "c6_sim unlocked");
+}
+
+console.log("\n[34b] CHAPTER 6 ERROR — leave guest open");
+{
+  const e = completeChapter5Ready();
+  completeC6Lab(e);
+  completeC6Mt(e);
+  e.startMission("c6_unifi");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c6_unifi.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "GW-UDM", "info");
+  assert(e.state.pendingDecision?.id === "c6u_marc", "leave guest open decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["c6_unifi"].errorKeys.includes("left_guest_open"), "left_guest_open recorded");
+  run(e, "GW-UDM", "set-guest-isolation on");
+  e.sendChat("itsupport", "isolation quand meme");
+  assert(e.state.missions["c6_unifi"].status === "completed", "still completable");
+  assert(e.state.missions["c6_unifi"].score < 100, "score penalized");
+}
+
+for (const variant of ["pf", "route", "guest"] as const) {
+  console.log(`\n[35] SIM c6_sim variant=${variant}`);
+  const e = completeChapter5Ready();
+  completeC6Lab(e);
+  completeC6Mt(e);
+  completeC6Unifi(e);
+  e.startMission("c6_sim", variant);
+  assert(e.state.missions["c6_sim"].variant === variant, `variant is ${variant}`);
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c6_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  if (variant === "pf") {
+    assert(e.state.world.fwRules.some((r) => r.id === "PF-HOLE"), "PF-HOLE injected");
+    run(e, "FW-PFS", "easyrule delete wan PF-HOLE");
+    const verify = run(e, "WS-001", "ping 192.168.20.45").join("\n");
+    assert(allLoss(verify) || verify.toLowerCase().includes("filter") || verify.toLowerCase().includes("timeout"), `[${variant}] Finance closed`);
+  } else if (variant === "route") {
+    assert(!(e.state.world.hosts["RTR-BR"]?.routes ?? []).length, "branch routes empty");
+    run(e, "RTR-BR", "/ip route add dst-address=0.0.0.0/0 gateway=172.16.0.1");
+    run(e, "RTR-BR", "/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade");
+    const verify = run(e, "PC-LEA", "ping 10.0.0.20").join("\n");
+    assert(noLoss(verify), `[${variant}] branch intranet verified`);
+  } else {
+    assert(e.state.world.hosts["GW-UDM"]?.guestIsolation === false, "guest isolation off");
+    run(e, "GW-UDM", "set-guest-isolation on");
+    const verify = run(e, "PC-PAUL", "ping 192.168.10.24").join("\n");
+    assert(allLoss(verify) || verify.toLowerCase().includes("filter") || verify.toLowerCase().includes("timeout"), `[${variant}] guest isolated`);
+  }
+  e.sendChat("itsupport", "rapport: incident reseau clos");
+  const s = e.state.missions["c6_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed (status=${s.status})`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "Network Administrator"),
+    `[${variant}] Network Administrator certificate`
+  );
+  assert(e.state.chapter >= 7, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[36] OLD SAVE — missing c6 hosts still start after chapter 5");
+{
+  const e = completeChapter5Ready();
+  delete e.state.missions["c6_lab"];
+  delete e.state.missions["c6_mt"];
+  delete e.state.missions["c6_unifi"];
+  delete e.state.missions["c6_sim"];
+  delete e.state.world.hosts["FW-PFS"];
+  delete e.state.world.hosts["RTR-BR"];
+  delete e.state.world.hosts["GW-UDM"];
+  delete e.state.world.hosts["PC-LEA"];
+  const hq = e.state.world.hosts["RTR-HQ"];
+  if (hq?.ifaces.eth5) delete hq.ifaces.eth5;
+  e.startMission("c6_lab");
+  assert(e.state.activeMissionId === "c6_lab", "c6_lab starts from a save that lacked chapter 6 runtimes");
+  assert(e.state.world.hosts["FW-PFS"]?.os.includes("pfSense"), "FW-PFS hydrated onto old save");
+  assert(e.state.world.hosts["RTR-BR"]?.os.includes("RouterOS"), "RTR-BR hydrated");
+  assert(e.state.world.hosts["GW-UDM"]?.os.includes("UniFi"), "GW-UDM hydrated");
+  assert(e.state.world.hosts["PC-LEA"]?.ifaces.eth0.ip === "192.168.50.24", "PC-LEA hydrated");
+  assert(e.state.world.hosts["SRV-WEB"]?.os.includes("Debian") || !!e.state.world.hosts["SRV-WEB"], "SRV-WEB still present");
+  assert(e.state.world.hosts["RTR-HQ"]?.ifaces.eth5?.ip === "172.16.0.1", "RTR-HQ eth5 hydrated on old save");
 }
 
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);

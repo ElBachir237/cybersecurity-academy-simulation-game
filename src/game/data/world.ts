@@ -19,6 +19,8 @@ export const CORE_CIDR = "10.0.0.0/24";
 export const FINANCE_CIDR = "192.168.20.0/24";
 export const OFFICE_CIDR = "192.168.10.0/24";
 export const FLOOR4_CIDR = "192.168.40.0/26";
+export const BRANCH_CIDR = "192.168.50.0/24";
+export const BRANCH_WAN = "172.16.0.0/30";
 
 function ipToInt(ip: string): number | null {
   const p = ip.split(".");
@@ -104,7 +106,19 @@ export function isWindowsOs(os: string): boolean {
 }
 
 export function isApOs(os: string): boolean {
-  return /unifi|ubiquiti/i.test(os);
+  return /unifi\s*ap|uap-/i.test(os);
+}
+
+export function isUnifiGwOs(os: string): boolean {
+  return /dream machine|\budm\b|\busg\b|unifi gateway/i.test(os);
+}
+
+export function isPfsenseOs(os: string): boolean {
+  return /pfsense/i.test(os);
+}
+
+export function isMikrotikOs(os: string): boolean {
+  return /routeros|mikrotik/i.test(os);
 }
 
 export function primaryIface(host: HostRuntime): { name: string; iface: IfaceRuntime } | null {
@@ -251,6 +265,43 @@ export function formatFwList(rules: FwRule[]): string[] {
   return lines;
 }
 
+export function formatPfRules(rules: FwRule[]): string[] {
+  const lines = ["No ALTQ support in GWT", "FILTER RULES:"];
+  for (const rule of rules) {
+    const act = rule.action === "allow" ? "pass" : "block";
+    const sticky = rule.sticky ? " [policy]" : "";
+    lines.push(
+      `${act} in inet from ${rule.src} to ${rule.dst} keep state # ${rule.id}${sticky}`
+    );
+  }
+  return lines;
+}
+
+export const PF_HOLE_ID = "PF-HOLE";
+export const GUEST_LAN_ID = "GUEST-LAN";
+
+export function pfHoleRule(): FwRule {
+  return {
+    id: PF_HOLE_ID,
+    action: "allow",
+    src: "0.0.0.0/0",
+    dst: FINANCE_CIDR,
+    proto: "any",
+    comment: "WAN any → Finance (pfSense hole)",
+  };
+}
+
+export function guestLanRule(): FwRule {
+  return {
+    id: GUEST_LAN_ID,
+    action: "allow",
+    src: "192.168.30.0/24",
+    dst: OFFICE_CIDR,
+    proto: "any",
+    comment: "guest VLAN → office (isolation off)",
+  };
+}
+
 // ---------------- Hosts (runtime seed) ----------------
 
 export function seedHosts(): Record<string, HostRuntime> {
@@ -326,6 +377,7 @@ export function seedHosts(): Record<string, HostRuntime> {
       eth2: { state: "up", dhcp: false, ip: "192.168.30.1", cidr: 24 },
       eth3: { state: "up", dhcp: false, ip: "10.0.0.1", cidr: 24 },
       eth4: { state: "up", dhcp: false, ip: "192.168.40.1", cidr: 26 },
+      eth5: { state: "up", dhcp: false, ip: "172.16.0.1", cidr: 30 },
     },
     dns: ["10.0.0.10"],
     services: { "isc-dhcp-server": "active", "named": "active", "frr": "active" },
@@ -398,6 +450,74 @@ export function seedHosts(): Record<string, HostRuntime> {
     logs: [
       "Sep 12 08:00:01 srv-dc samba[412]: samba-ad-dc started",
       "Sep 12 08:00:02 srv-dc samba[412]: domain HORIZON.LOCAL online",
+    ],
+  });
+
+  add({
+    id: "FW-PFS",
+    label: "FW-PFS — Pare-feu pfSense (siège)",
+    os: "pfSense 2.7.2",
+    room: "Baie 1",
+    ifaces: {
+      em0: { state: "up", dhcp: false, ip: "203.0.113.2", cidr: 24, gw: "203.0.113.1" },
+      em1: { state: "up", dhcp: false, ip: "10.0.0.2", cidr: 24 },
+    },
+    dns: ["10.0.0.10"],
+    services: { filter: "active", "openvpn": "active" },
+    logs: [
+      "Sep 12 08:00:00 fw-pfs php-fpm: webConfigurator started",
+      "Sep 12 08:00:01 fw-pfs filterlog: default deny LAN RFC1918",
+    ],
+  });
+
+  add({
+    id: "RTR-BR",
+    label: "RTR-BR — MikroTik filiale Lyon",
+    os: "MikroTik RouterOS 7.14",
+    room: "Filiale Lyon — baie",
+    ifaces: {
+      ether1: { state: "up", dhcp: false, ip: "172.16.0.2", cidr: 30, gw: "172.16.0.1" },
+      ether2: { state: "up", dhcp: false, ip: "192.168.50.1", cidr: 24 },
+    },
+    dns: ["10.0.0.10"],
+    services: {},
+    routes: [{ dst: "0.0.0.0/0", gateway: "172.16.0.1" }],
+    nat: [{ id: "NAT-1", chain: "srcnat", action: "masquerade", outInterface: "ether1" }],
+    logs: [
+      "Sep 12 08:00:00 rtr-br: RouterOS 7.14 started",
+    ],
+  });
+
+  add({
+    id: "GW-UDM",
+    label: "GW-UDM — Passerelle UniFi (UDM)",
+    os: "UniFi Dream Machine",
+    room: "Baie 1",
+    ifaces: {
+      lan: { state: "up", dhcp: false, ip: "192.168.10.3", cidr: 24, gw: "192.168.10.1" },
+      wan: { state: "up", dhcp: false, ip: "10.0.0.4", cidr: 24, gw: "10.0.0.1" },
+    },
+    dns: ["10.0.0.10"],
+    services: { unifi: "active" },
+    guestIsolation: true,
+    logs: [
+      "Sep 12 08:00:00 gw-udm: UniFi OS started",
+      "Sep 12 08:00:01 gw-udm: guest isolation enabled",
+    ],
+  });
+
+  add({
+    id: "PC-LEA",
+    label: "PC-LEA — Poste de Léa (filiale Lyon)",
+    os: "Ubuntu 22.04 LTS",
+    room: "Filiale Lyon",
+    ifaces: {
+      eth0: { state: "up", dhcp: false, ip: "192.168.50.24", cidr: 24, gw: "192.168.50.1" },
+    },
+    dns: ["10.0.0.10"],
+    services: { "systemd-networkd": "active", "systemd-resolved": "active" },
+    logs: [
+      "Sep 12 08:10:00 pc-lea: workstation up",
     ],
   });
 
@@ -642,6 +762,7 @@ export const NPCS: NpcDef[] = [
   { id: "nour", nameKey: "npc.nour", roleKey: "npc.nourRole", dept: "Produit" },
   { id: "amina", nameKey: "npc.amina", roleKey: "npc.aminaRole", dept: "Accueil" },
   { id: "jules", nameKey: "npc.jules", roleKey: "npc.julesRole", dept: "RH" },
+  { id: "lea", nameKey: "npc.lea", roleKey: "npc.leaRole", dept: "Filiale Lyon" },
 ];
 
 // ---------------- Topology (for the Network app) ----------------
@@ -655,6 +776,9 @@ export interface TopoNode {
 
 export const TOPO_NODES: TopoNode[] = [
   { id: "RTR-HQ", label: "RTR-HQ", kind: "router", x: 400, y: 80 },
+  { id: "FW-PFS", label: "FW-PFS", kind: "router", x: 280, y: 80 },
+  { id: "GW-UDM", label: "GW-UDM", kind: "router", x: 520, y: 80 },
+  { id: "RTR-BR", label: "RTR-BR", kind: "router", x: 80, y: 80 },
   { id: "SW-01", label: "SW-01", kind: "switch", x: 400, y: 200 },
   { id: "DNS-01", label: "DNS-01", kind: "server", x: 180, y: 200 },
   { id: "COMP-01", label: "COMP-01", kind: "server", x: 620, y: 200 },
@@ -668,10 +792,15 @@ export const TOPO_NODES: TopoNode[] = [
   { id: "PC-WIN", label: "PC-WIN", kind: "pc", x: 290, y: 400 },
   { id: "PC-AMINA", label: "PC-AMINA", kind: "pc", x: 510, y: 400 },
   { id: "PRN-01", label: "PRN-01", kind: "pc", x: 620, y: 400 },
+  { id: "PC-LEA", label: "PC-LEA", kind: "pc", x: 80, y: 200 },
 ];
 
 export const TOPO_LINKS: [string, string][] = [
   ["RTR-HQ", "SW-01"],
+  ["RTR-HQ", "FW-PFS"],
+  ["RTR-HQ", "GW-UDM"],
+  ["RTR-HQ", "RTR-BR"],
+  ["RTR-BR", "PC-LEA"],
   ["RTR-HQ", "DNS-01"],
   ["RTR-HQ", "COMP-01"],
   ["SW-01", "SRV-WEB"],

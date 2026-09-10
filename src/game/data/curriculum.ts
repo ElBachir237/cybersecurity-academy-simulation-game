@@ -54,6 +54,9 @@ export const SKILLS: SkillDef[] = [
   { id: "wifi", label: { fr: "Wi-Fi", en: "Wi-Fi" }, track: "network", prereq: ["network_basics"] },
   { id: "network_basics", label: { fr: "Bases réseau", en: "Network basics" }, track: "network", prereq: ["internet_basics"] },
   { id: "network_diag", label: { fr: "Diagnostic réseau", en: "Network diagnostics" }, track: "network", prereq: ["dns", "dhcp"] },
+  { id: "pfsense", label: { fr: "pfSense", en: "pfSense" }, track: "network", prereq: ["firewall"] },
+  { id: "mikrotik", label: { fr: "MikroTik RouterOS", en: "MikroTik RouterOS" }, track: "network", prereq: ["routing", "firewall"] },
+  { id: "unifi", label: { fr: "UniFi Gateway", en: "UniFi Gateway" }, track: "network", prereq: ["wifi", "vlan"] },
   // Systems
   { id: "linux_admin", label: { fr: "Administration Linux", en: "Linux administration" }, track: "systems", prereq: ["terminal"] },
   { id: "windows_admin", label: { fr: "Administration Windows", en: "Windows administration" }, track: "systems", prereq: ["computer_basics"] },
@@ -154,7 +157,14 @@ export const CHAPTERS: ChapterDef[] = [
     theoryKeys: ["c5_svc", "c5_vhost", "c5_ad"],
     missionIds: ["c5_lab", "c5_web", "c5_ad", "c5_sim"],
   },
-  { id: 6, titleKey: "Admin réseau", status: "soon", theoryKeys: [], missionIds: [] },
+  {
+    id: 6,
+    titleKey: "chapter6",
+    subKey: "chapter6",
+    status: "released",
+    theoryKeys: ["c6_pf", "c6_mt", "c6_unifi"],
+    missionIds: ["c6_lab", "c6_mt", "c6_unifi", "c6_sim"],
+  },
   { id: 7, titleKey: "SOC L1", status: "soon", theoryKeys: [], missionIds: [] },
   { id: 8, titleKey: "SOC L2", status: "soon", theoryKeys: [], missionIds: [] },
   { id: 9, titleKey: "Incident Response", status: "soon", theoryKeys: [], missionIds: [] },
@@ -180,6 +190,7 @@ export const BADGES: BadgeDef[] = [
   { id: "service_restarter", icon: "server", nameKey: "badges.service_restarter.name", descKey: "badges.service_restarter.desc" },
   { id: "web_host", icon: "globe", nameKey: "badges.web_host.name", descKey: "badges.web_host.desc" },
   { id: "directory_clerk", icon: "users", nameKey: "badges.directory_clerk.name", descKey: "badges.directory_clerk.desc" },
+  { id: "vendor_net", icon: "server", nameKey: "badges.vendor_net.name", descKey: "badges.vendor_net.desc" },
 ];
 
 export interface TitleDef {
@@ -246,6 +257,13 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 5",
     missionIds: ["c5_lab", "c5_web", "c5_ad", "c5_sim"],
     skills: ["linux_admin", "services", "web_hosting", "active_directory"],
+  },
+  {
+    id: "net_admin",
+    titleKey: "Network Administrator",
+    level: "Chapter 6",
+    missionIds: ["c6_lab", "c6_mt", "c6_unifi", "c6_sim"],
+    skills: ["pfsense", "mikrotik", "unifi", "firewall"],
   },
 ];
 

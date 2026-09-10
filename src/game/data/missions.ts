@@ -5,6 +5,7 @@
 // Chapter 3: firewall lab -> switch/NAT tickets -> exam
 // Chapter 4: Windows helpdesk -> UniFi Wi-Fi -> lockout/printer -> exam
 // Chapter 5: nginx/smbd lab -> vhost + DNS -> Samba AD user -> exam
+// Chapter 6: pfSense hole -> MikroTik branch -> UniFi guest isolation -> exam
 // Every step is data: enter hooks build the world (mails, chats,
 // calls, notifications) and handlers validate professional
 // reflexes rather than flag hunting.
@@ -31,6 +32,7 @@ import {
 } from "./world";
 import { c4_desk, c4_lab, c4_sim, c4_wifi } from "./missionsChapter4";
 import { c5_ad, c5_lab, c5_sim, c5_web } from "./missionsChapter5";
+import { c6_lab, c6_mt, c6_sim, c6_unifi } from "./missionsChapter6";
 
 // ---------------- event matching helpers ----------------
 const baseCmd = (e: EngineEvent): string | undefined => {
@@ -2638,6 +2640,10 @@ export const MISSIONS: Record<string, MissionDef> = {
   c5_web,
   c5_ad,
   c5_sim,
+  c6_lab,
+  c6_mt,
+  c6_unifi,
+  c6_sim,
 };
 
 export function getMission(id: string): MissionDef | undefined {
@@ -2664,6 +2670,10 @@ export const MISSION_ORDER = [
   "c5_web",
   "c5_ad",
   "c5_sim",
+  "c6_lab",
+  "c6_mt",
+  "c6_unifi",
+  "c6_sim",
 ];
 
 export function pickSimVariant(attempts: number): string {

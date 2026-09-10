@@ -87,6 +87,12 @@ export interface HostRuntime {
   wifiAp?: WifiApConfig;
   wifiClient?: WifiClientConfig;
   accounts?: Record<string, LocalAccount>;
+  /** RouterOS / pfSense static routes (dst CIDR → gateway). */
+  routes?: { dst: string; gateway: string }[];
+  /** RouterOS NAT rules (srcnat masquerade, etc.). */
+  nat?: { id: string; chain: string; action: string; outInterface?: string }[];
+  /** UniFi gateway: isolate guest VLAN from corporate LAN. */
+  guestIsolation?: boolean;
 }
 
 export interface Ticket {

@@ -25,9 +25,10 @@ export default function TerminalApp() {
   live.current = { overlayCount };
   const host = state.world.hosts[hostId];
   const winShell = /windows/i.test(host?.os ?? "");
-  const apShell = /unifi|ubiquiti/i.test(host?.os ?? "");
-  const promptHost = winShell ? `${hostId}` : apShell ? `${hostId}` : `student@${hostId.toLowerCase()}`;
-  const promptSymbol = winShell ? ">" : apShell ? "#" : "❯";
+  const apShell = /unifi\s*ap|uap-/i.test(host?.os ?? "");
+  const vendorShell = /pfsense|routeros|mikrotik|dream machine/i.test(host?.os ?? "");
+  const promptHost = winShell ? `${hostId}` : apShell || vendorShell ? `${hostId}` : `student@${hostId.toLowerCase()}`;
+  const promptSymbol = winShell ? ">" : apShell || vendorShell ? "#" : "❯";
   const blocks = session?.blocks ?? EMPTY_BLOCKS;
   const draft = session?.draft ?? "";
   const fr = state.profile?.lang !== "en";

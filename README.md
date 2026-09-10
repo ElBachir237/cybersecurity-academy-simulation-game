@@ -58,7 +58,7 @@ Ce sont des commandes **d’exploitation légitime** (admin, diag, durcissement)
 
 ## Campagne actuelle
 
-Le curriculum **jouable** aujourd’hui : chapitres **1 à 5**. La vision carrière (pfSense → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 6–10 en « à venir ».
+Le curriculum **jouable** aujourd’hui : chapitres **1 à 6**. La vision carrière (atelier architecture → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 7–10 en « à venir ».
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -130,6 +130,21 @@ Commandes : `sudo systemctl status|start|reload nginx`, `journalctl -u nginx`, `
 
 Réussir le chapitre débloque le certificat **Systems Technician**.
 
+### Chapitre 6 — Admin réseau d’entreprise (`released`)
+
+Boucle **matériel de marque** : `FW-PFS` (pfSense), `RTR-BR` (MikroTik RouterOS, filiale Lyon), `GW-UDM` (passerelle UniFi). Même politique réseau qu’au ch. 3 (`iptables` sur le générique **reste**), syntaxes de terrain. Les vieilles saves reçoivent les hôtes sans reset.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Trou pfSense** (`c6_lab`) | Lab | Règle `PF-HOLE` (`0.0.0.0/0` → Finance) : `pfctl -sr`, `easyrule delete wan PF-HOLE`, ping Finance timeout, DNS OK |
+| **Filiale Lyon coupée** (`c6_mt`) | Mission | `RTR-BR` sans route / NAT ; `/ip route add` + masquerade ; ping intranet depuis `PC-LEA` ; skip NAT = erreur |
+| **Guests trop ouverts** (`c6_unifi`) | Mission | Isolation guest off + `GUEST-LAN` ; `set-guest-isolation on` ; `PC-PAUL` ne ping plus `192.168.10.24` |
+| **Simulation : matériel réseau** (`c6_sim`) | Simulation | Variantes `pf` / `route` / `guest` |
+
+Commandes : `pfctl -sr\|-sn\|-s interfaces`, `easyrule delete wan <id>`, `/ip address print`, `/ip route print`, `/ip route add dst-address=0.0.0.0/0 gateway=172.16.0.1`, `/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade`, `info`, `show network\|firewall`, `set-guest-isolation on\|off`.
+
+Réussir le chapitre débloque le certificat **Network Administrator**.
+
 ---
 
 ## Vision : une carrière, pas un catalogue
@@ -182,11 +197,11 @@ Même politique, **syntaxes différentes** : un trou `0.0.0.0/0` se voit aussi b
 
 Chaque chapitre : **lab + tickets terrain + décision + examen à variantes**, certificat, skills branchées sur le moteur. Les titres ci-dessous sont le **but métier** ; l’Académie actuelle affiche encore 10 lignes « soon » — elles seront renommées / étendues au fur et à mesure.
 
-### Chapitres 1–5 — `released` (années 0–2)
+### Chapitres 1–6 — `released` (années 0–2)
 
-Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, **puis serveurs / nginx / AD simulé**. Voir ci-dessus.
+Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / nginx / AD simulé, **puis pfSense / MikroTik / passerelle UniFi**. Voir ci-dessus.
 
-**Compétences déjà en jeu :** terminal, DNS, DHCP, IPv4/CIDR, VLAN, switching d’accès, firewall FORWARD, NAT trop ouvert, **ipconfig / netsh**, UniFi SSID/VLAN, compte Windows, spooler, **systemctl / nginx / vhost / samba-tool**.
+**Compétences déjà en jeu :** terminal, DNS, DHCP, IPv4/CIDR, VLAN, switching d’accès, firewall FORWARD, NAT trop ouvert, **ipconfig / netsh**, UniFi SSID/VLAN, compte Windows, spooler, **systemctl / nginx / vhost / samba-tool**, **pfctl / easyrule**, **RouterOS `/ip route` + NAT**, **set-guest-isolation**.
 
 ### Chapitre 5 — Systèmes & hébergement (`released`)
 
@@ -196,15 +211,15 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, **puis serveu
 
 **Skills :** `linux_admin`, `windows_admin`, `services`, `web_hosting`, `active_directory` (base). Certificat : **Systems Technician**.
 
-### Chapitre 6 — Admin réseau d’entreprise (le vrai matériel)
+### Chapitre 6 — Admin réseau d’entreprise (`released`)
 
-**But :** le quotidien : tu ne parles plus à un FW générique. Tu configures **pfSense**, **MikroTik**, **passerelle UniFi**, switch, AP — NAT, VLAN, DHCP, VPN, WAN.
+**But :** le quotidien : tu ne parles plus à un FW générique. Tu configures **pfSense**, **MikroTik**, **passerelle UniFi** — NAT, VLAN, isolation guest, WAN de filiale.
 
-**Objectif :** un changement tenu de bout en bout (ex. filiale MikroTik + siège pfSense + SSID UniFi) vérifié par ping, par un collègue, et par un site qui répond derrière le reverse proxy.
+**Objectif (jouable) :** fermer un trou pfSense, rétablir une filiale MikroTik (route + NAT), isoler le VLAN guest sur l’UDM — vérifié par ping et par un collègue.
 
-**Skills :** `routing`, `switching`, `vlan`, `firewall`, `wifi`, `mikrotik`, `pfsense`, `unifi`. Certificat : **Network Administrator**.
+**Skills :** `routing`, `firewall`, `wifi`, `mikrotik`, `pfsense`, `unifi`. Certificat : **Network Administrator**.
 
-**Atelier architecture — palier 1 :** tu **places** toi-même un pfSense (ou un MikroTik), un switch, un AP UniFi, un `SRV-WEB` ; tu câbles ; tu dois faire passer adressage + segmentation + **un site intranet joignable**.
+**Atelier architecture — palier 1 (E5, pas encore jouable) :** tu **places** toi-même un pfSense (ou un MikroTik), un switch, un AP UniFi, un `SRV-WEB` ; tu câbles ; tu dois faire passer adressage + segmentation + **un site intranet joignable**.
 
 ### Chapitre 7 — SOC L1
 
@@ -282,7 +297,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E1** | Ch. 4 Helpdesk : Windows + `ipconfig`/`netsh` + Wi-Fi/AP | **Fait** |
 | **E2** | Horloge de mission + dossier de carrière (décisions persistantes) | **Fait** |
 | **E3** | Ch. 5 Systèmes + AD simulé + **hébergement** (vhost nginx, site visible dans Browser) | **Fait** |
-| **E4** | Ch. 6 : **pfSense + MikroTik RouterOS + passerelle UniFi** (plus le FW générique seul) | Quotidien réseau réel |
+| **E4** | Ch. 6 : **pfSense + MikroTik RouterOS + passerelle UniFi** (plus le FW générique seul) | **Fait** |
 | **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | « Je construis le siège » |
 | **E6** | Ch. 7 SOC L1 + app SOC branchée + timer | Porte d’entrée cyber |
 | **E7** | Co-op 2 joueurs (helpdesk + SOC) + vue formateur | Travail en équipe |
@@ -291,7 +306,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
 | **E11** | Ch. 14–15 GRC + capstone | Management / expert |
 
-**Prochaine implémentation :** étape **E4** (pfSense + MikroTik RouterOS + passerelle UniFi). Pas le SOC, pas l’atelier 5★.
+**Prochaine implémentation :** étape **E5** (atelier architecture palier 1 : poser / câbler / configurer). Pas le SOC.
 
 ---
 
@@ -406,7 +421,7 @@ Aujourd’hui une mission = TypeScript + closures. Un formateur ne peut pas écr
 ### 3. Monde simulé plus riche
 
 - Hôtes **Windows** et CLI `ipconfig` / `netsh` (chapitre 4 — **en jeu**).
-- **MikroTik RouterOS**, **pfSense**, **passerelle UniFi** (ch. 6) — syntaxe / UI de chaque marque.
+- **MikroTik RouterOS**, **pfSense**, **passerelle UniFi** (ch. 6 — **en jeu**, CLI simulé).
 - Serveurs + **hébergement web** : vhosts, DNS, TLS, sites qui s’ouvrent dans Browser.
 - Active Directory **simulé**, IAM, certificats PKI — les skills existent, le monde non encore.
 - SIEM plus crédible : corrélation, fenêtres de logs, fausse piste.
@@ -457,13 +472,13 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | Couche | Maturité |
 | --- | --- |
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
-| Moteur + terminal | Solide pour les ch. 1–4 (Linux, Windows, VLAN, FW, switch, UniFi AP) |
-| Contenu jouable | Chapitres 1–4 (labs + tickets + exams à variantes) |
-| Curriculum carrière (ch. 5–15, pfSense/MikroTik, hébergement, atelier) | Vision écrite, pas encore jouable |
+| Moteur + terminal | Solide pour les ch. 1–6 (Linux, Windows, VLAN, FW, switch, UniFi AP/GW, pfSense, RouterOS) |
+| Contenu jouable | Chapitres 1–6 (labs + tickets + exams à variantes) |
+| Curriculum carrière (ch. 7–15, atelier architecture, SOC) | Vision écrite, pas encore jouable |
 | SOC, certificats serveur, classe | Amorcé |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est un **début de carrière IT** (helpdesk Linux → adressage → segmentation → helpdesk Windows / Wi-Fi → **systèmes / nginx / AD simulé**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (pfSense, MikroTik, SOC, architecture 5★). La suite utile : **E4**.
+Le prototype est un **début de carrière IT** (helpdesk Linux → adressage → segmentation → helpdesk Windows / Wi-Fi → systèmes / nginx / AD simulé → **pfSense / MikroTik / UniFi**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (atelier architecture, SOC, 5★). La suite utile : **E5**.
 
 ---
 

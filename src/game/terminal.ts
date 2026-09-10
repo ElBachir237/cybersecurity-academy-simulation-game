@@ -5,7 +5,7 @@
 // are reproducible and verifiable through real diagnostic reflexes.
 // ============================================================
 
-import type { GameState, HostRuntime } from "./types";
+import type { FwRule, GameState, HostRuntime, SwitchPort } from "./types";
 import type { TFn } from "./i18n";
 import {
   DNS_ZONE,
@@ -15,11 +15,17 @@ import {
   findApBySsid,
   firewallAllows,
   formatFwList,
+  formatPfRules,
   formatSwitchPorts,
   formatVlanTable,
+  GUEST_LAN_ID,
+  guestLanRule,
   httpSite,
   ipInCidr,
   isApOs,
+  isMikrotikOs,
+  isPfsenseOs,
+  isUnifiGwOs,
   isWindowsOs,
   l2Allowed,
   primaryIface,
@@ -27,7 +33,6 @@ import {
   seedFwRules,
   seedSwitchPorts,
 } from "./data/world";
-import type { FwRule, SwitchPort } from "./types";
 
 export interface TermSignals {
   cmd: string;
@@ -136,8 +141,28 @@ function pathTo(target: string, host: HostRuntime, state: GameState): PathResult
     }
   }
   if (!gwExists) return "no-route";
+  if (!mikrotikForwards(iface.gw, target, state)) return "no-route";
   if (!firewallAllows(iface.ip, target, state)) return "filtered";
   return "ok";
+}
+
+function mikrotikForwards(gwIp: string, dest: string, state: GameState): boolean {
+  let gwHost: HostRuntime | undefined;
+  for (const h of Object.values(state.world.hosts)) {
+    for (const i of Object.values(h.ifaces)) {
+      if (i.ip === gwIp) gwHost = h;
+    }
+  }
+  if (!gwHost || !isMikrotikOs(gwHost.os)) return true;
+  const connected = Object.values(gwHost.ifaces).some(
+    (i) => i.ip && i.cidr != null && i.state === "up" && sameSubnet(dest, i.ip, i.cidr)
+  );
+  if (connected) return true;
+  const routes = gwHost.routes ?? [];
+  const hasRoute = routes.some((r) => r.dst === "0.0.0.0/0" || ipInCidr(dest, r.dst));
+  if (!hasRoute) return false;
+  const nat = gwHost.nat ?? [];
+  return nat.some((n) => n.chain === "srcnat" && n.action === "masquerade");
 }
 
 export function ipReachable(
@@ -1146,6 +1171,236 @@ function execPrinterShell(argv: string[], host: HostRuntime): TermResult {
   return { output: [`${argv[0]}: not available on this device`], signals };
 }
 
+function ensureFwRules(state: GameState): FwRule[] {
+  if (!Array.isArray(state.world.fwRules) || state.world.fwRules.length === 0) {
+    state.world.fwRules = seedFwRules();
+  }
+  return state.world.fwRules;
+}
+
+function deleteFwById(state: GameState, id: string, host: HostRuntime): string[] {
+  const rules = ensureFwRules(state);
+  const idx = rules.findIndex((r) => r.id === id);
+  if (idx < 0) return [`no such rule ${id}`];
+  if (rules[idx].sticky) return [`cannot delete policy rule ${id}`];
+  const removed = rules.splice(idx, 1)[0];
+  host.logs.push(`Sep 12 fw: deleted ${removed.id} (${removed.src} -> ${removed.dst})`);
+  return [`deleted ${removed.id}`];
+}
+
+function execPfsenseShell(argv: string[], host: HostRuntime, state: GameState, t: TFn): TermResult {
+  const signals: TermSignals = { cmd: argv[0] ?? "", argv };
+  const cmd = (argv[0] ?? "").toLowerCase();
+  const out: string[] = [];
+  if (cmd === "help" || cmd === "?") {
+    out.push("pfSense CLI (simulé, syntaxe réelle)");
+    out.push("  pfctl -sr                 règles FILTER");
+    out.push("  pfctl -sn                 NAT");
+    out.push("  pfctl -s interfaces       WAN/LAN");
+    out.push("  easyrule delete wan <id>  retirer une règle (ex. PF-HOLE)");
+    out.push("  ping <hôte>");
+    return { output: out, signals };
+  }
+  if (cmd === "ping") {
+    out.push(...cmdPing(argv.slice(1), host, state, t));
+    return { output: out, signals };
+  }
+  if (cmd === "pfctl") {
+    const flag = argv[1];
+    const what = argv[2];
+    if (flag === "-sr" || (flag === "-s" && what === "rules")) {
+      return { output: formatPfRules(ensureFwRules(state)), signals };
+    }
+    if (flag === "-sn" || (flag === "-s" && what === "nat")) {
+      return { output: ["NAT RULES:", "nat on em0 inet from 10.0.0.0/8 to any -> (em0) port 1024:65535"], signals };
+    }
+    if (flag === "-si" || (flag === "-s" && (what === "interfaces" || what === "info"))) {
+      out.push("WAN (em0) 203.0.113.2/24");
+      out.push("LAN (em1) 10.0.0.2/24");
+      return { output: out, signals };
+    }
+    return { output: ["pfctl: usage: pfctl -sr | -sn | -s interfaces"], signals };
+  }
+  if (cmd === "easyrule") {
+    const action = (argv[1] ?? "").toLowerCase();
+    if (action === "delete") {
+      const id = argv[3] ?? argv[2];
+      if (!id) return { output: ["easyrule: usage: easyrule delete wan <id>"], signals };
+      const res = deleteFwById(state, id, host);
+      if (res[0]?.startsWith("deleted")) return { output: [`easyrule: ${res[0]}`], signals };
+      if (res[0]?.includes("policy")) return { output: [`easyrule: ${res[0]}`], signals };
+      return { output: [`easyrule: ${res[0]}`], signals };
+    }
+    if (action === "pass" || action === "block") {
+      const dst = argv.find((a) => a.includes("/")) ?? "0.0.0.0/0";
+      const rules = ensureFwRules(state);
+      const id = `PF-${rules.length + 1}`;
+      rules.push({
+        id,
+        action: action === "block" ? "deny" : "allow",
+        src: "0.0.0.0/0",
+        dst,
+        proto: "any",
+        comment: "easyrule",
+      });
+      return { output: [`easyrule: added ${id} ${action} any -> ${dst}`], signals };
+    }
+    return { output: ["easyrule: usage: easyrule delete wan <id> | easyrule pass wan <cidr>"], signals };
+  }
+  out.push(`${argv[0]}: unknown command — tapez help`);
+  return { output: out, signals };
+}
+
+function rosLine(argv: string[]): string {
+  return argv.join(" ").replace(/^\//, "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function rosProps(argv: string[]): Record<string, string> {
+  const props: Record<string, string> = {};
+  for (const a of argv) {
+    const eq = a.indexOf("=");
+    if (eq > 0) props[a.slice(0, eq).toLowerCase()] = a.slice(eq + 1);
+  }
+  return props;
+}
+
+function execMikrotikShell(argv: string[], host: HostRuntime, state: GameState, t: TFn): TermResult {
+  const signals: TermSignals = { cmd: argv[0] ?? "", argv };
+  const line = rosLine(argv);
+  const out: string[] = [];
+  if (!line || line === "help" || line === "?" || line === "ip") {
+    out.push("MikroTik RouterOS (simulé)");
+    out.push("  /ip address print");
+    out.push("  /ip route print");
+    out.push("  /ip route add dst-address=0.0.0.0/0 gateway=172.16.0.1");
+    out.push("  /ip firewall nat print");
+    out.push("  /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade");
+    out.push("  ping <hôte>");
+    return { output: out, signals };
+  }
+  if (argv[0]?.toLowerCase() === "ping") {
+    out.push(...cmdPing(argv.slice(1), host, state, t));
+    return { output: out, signals };
+  }
+  if (line.startsWith("ip address print") || line === "ip address") {
+    out.push("Flags: X - disabled, I - invalid, D - dynamic");
+    out.push("#   ADDRESS            INTERFACE");
+    let n = 0;
+    for (const [name, iface] of Object.entries(host.ifaces)) {
+      const addr = iface.ip ? `${iface.ip}/${iface.cidr ?? 24}` : "-";
+      out.push(`${n}   ${addr.padEnd(18)} ${name}`);
+      n += 1;
+    }
+    return { output: out, signals };
+  }
+  if (line.startsWith("ip route print") || line === "ip route") {
+    const routes = host.routes ?? [];
+    out.push("Flags: A - active, S - static");
+    out.push("#      DST-ADDRESS        GATEWAY");
+    if (!routes.length) out.push("(no routes)");
+    routes.forEach((r, i) => {
+      out.push(`${i}  AS  ${r.dst.padEnd(18)} ${r.gateway}`);
+    });
+    return { output: out, signals };
+  }
+  if (line.startsWith("ip route add")) {
+    const p = rosProps(argv);
+    const dst = p["dst-address"] ?? p.dst ?? "";
+    const gw = p.gateway ?? "";
+    if (!dst || !gw) {
+      return { output: ["syntax: /ip route add dst-address=0.0.0.0/0 gateway=172.16.0.1"], signals };
+    }
+    host.routes = [...(host.routes ?? []).filter((r) => r.dst !== dst), { dst, gateway: gw }];
+    host.logs.push(`Sep 12 ros: route add ${dst} via ${gw}`);
+    return { output: ["Route added"], signals };
+  }
+  if (line.startsWith("ip firewall nat print") || line === "ip firewall nat") {
+    const nat = host.nat ?? [];
+    out.push("Flags: X - disabled, I - invalid");
+    out.push("#    CHAIN     ACTION      OUT-IF");
+    if (!nat.length) out.push("(no nat rules)");
+    nat.forEach((n, i) => {
+      out.push(`${i}    ${n.chain.padEnd(9)} ${n.action.padEnd(11)} ${n.outInterface ?? ""}`);
+    });
+    return { output: out, signals };
+  }
+  if (line.startsWith("ip firewall nat add")) {
+    const p = rosProps(argv);
+    const chain = p.chain ?? "srcnat";
+    const action = p.action ?? "";
+    const outIf = p["out-interface"];
+    if (action !== "masquerade") {
+      return { output: ["syntax: /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade"], signals };
+    }
+    const id = `NAT-${(host.nat?.length ?? 0) + 1}`;
+    host.nat = [...(host.nat ?? []), { id, chain, action, outInterface: outIf }];
+    host.logs.push(`Sep 12 ros: nat add ${chain} ${action} ${outIf ?? ""}`);
+    return { output: ["NAT rule added"], signals };
+  }
+  out.push("bad command name /ip (type help)");
+  return { output: out, signals };
+}
+
+function execUnifiGwShell(argv: string[], host: HostRuntime, state: GameState, t: TFn): TermResult {
+  const signals: TermSignals = { cmd: argv[0] ?? "", argv };
+  const cmd = (argv[0] ?? "").toLowerCase();
+  const out: string[] = [];
+  if (cmd === "help" || cmd === "?") {
+    out.push("UniFi Gateway CLI (UDM, simulé)");
+    out.push("  info");
+    out.push("  show network | show firewall");
+    out.push("  set-guest-isolation on|off");
+    out.push("  ping <hôte>");
+    return { output: out, signals };
+  }
+  if (cmd === "ping") {
+    out.push(...cmdPing(argv.slice(1), host, state, t));
+    return { output: out, signals };
+  }
+  if (cmd === "info") {
+    out.push(`Model:       UniFi Dream Machine`);
+    out.push(`Version:     3.2.12`);
+    out.push(`LAN:         ${host.ifaces.lan?.ip ?? ""}`);
+    out.push(`WAN:         ${host.ifaces.wan?.ip ?? ""}`);
+    out.push(`Guest isol.: ${host.guestIsolation === false ? "off" : "on"}`);
+    return { output: out, signals };
+  }
+  if (cmd === "show") {
+    const what = (argv[1] ?? "").toLowerCase();
+    if (what === "network" || what === "networks") {
+      out.push("NETWORK          VLAN  PURPOSE");
+      out.push("HORIZON-CORP     10    Corporate");
+      out.push("HORIZON-GUEST    30    Guest");
+      out.push(`Guest isolation  ${host.guestIsolation === false ? "OFF" : "ON"}`);
+      return { output: out, signals };
+    }
+    if (what === "firewall" || what === "fw") {
+      return { output: formatFwList(ensureFwRules(state)), signals };
+    }
+    return { output: ["show network | show firewall"], signals };
+  }
+  if (cmd === "set-guest-isolation" || cmd === "setguestisolation") {
+    const arg = (argv[1] ?? "").toLowerCase();
+    if (arg !== "on" && arg !== "off") {
+      return { output: ["usage: set-guest-isolation on|off"], signals };
+    }
+    host.guestIsolation = arg === "on";
+    const rules = ensureFwRules(state);
+    const idx = rules.findIndex((r) => r.id === GUEST_LAN_ID);
+    if (arg === "on" && idx >= 0) {
+      rules.splice(idx, 1);
+      host.logs.push("Sep 12 unifi: guest isolation on, GUEST-LAN removed");
+    }
+    if (arg === "off" && idx < 0) {
+      rules.push(guestLanRule());
+      host.logs.push("Sep 12 unifi: guest isolation off, GUEST-LAN added");
+    }
+    return { output: [`Guest isolation ${arg}`], signals };
+  }
+  out.push(`${argv[0]}: unknown — type help`);
+  return { output: out, signals };
+}
+
 // ---------------- Main executor ----------------
 export function execTerminal(
   line: string,
@@ -1169,6 +1424,9 @@ export function execTerminal(
 
   if (isWindowsOs(host.os)) return execWindowsShell(argv, host, state, t);
   if (isApOs(host.os)) return execApShell(argv, host, state, t);
+  if (isUnifiGwOs(host.os)) return execUnifiGwShell(argv, host, state, t);
+  if (isPfsenseOs(host.os)) return execPfsenseShell(argv, host, state, t);
+  if (isMikrotikOs(host.os)) return execMikrotikShell(argv, host, state, t);
   if (/jetdirect|laserjet|printer/i.test(host.os)) return execPrinterShell(argv, host);
 
   const out: string[] = [];
