@@ -644,6 +644,81 @@ function completeE6Phish(e: GameEngine) {
   e.sendChat("soc", "phishing signale");
 }
 
+function completeE6Sim(e: GameEngine) {
+  e.startMission("e6_sim", "noise");
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.e6_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  triageNoise(e);
+  e.sendChat("soc", "rapport L1");
+}
+
+function completeChapter8Ready(): GameEngine {
+  const e = completeChapter7Ready();
+  completeE6Lab(e);
+  completeE6Phish(e);
+  completeE6Sim(e);
+  return e;
+}
+
+const SAMPLE_HASH = "a4f3c8e19b2d7e6a1c0f5d8b3e7a9124c6d0e8f1a2b3c4d5e6f708192a3b4c5d";
+const SAMPLE_FILE = "/opt/horizon/sandbox/sample.quarantine";
+
+function completeE7Lab(e: GameEngine) {
+  e.startMission("e7_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", `sha256sum ${SAMPLE_FILE}`);
+  run(e, "WS-001", `strings ${SAMPLE_FILE}`);
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  e.sendChat("soc", "PC-PAUL isole, hash lu");
+}
+
+function completeE7Ioc(e: GameEngine) {
+  e.startMission("e7_ioc");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e7_ioc.mailSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "PC-PAUL", "grep beacon /var/log/syslog");
+  run(e, "WS-001", `ioc add ${SAMPLE_HASH}`);
+  e.sendChat("soc", "IOC en watchlist");
+}
+
+function completeE7Sim(e: GameEngine) {
+  e.startMission("e7_sim", "hash");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e7_sim.mailSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "WS-001", `sha256sum ${SAMPLE_FILE}`);
+  e.sendChat("soc", "hash confirme");
+}
+
+function completeChapter9Ready(): GameEngine {
+  const e = completeChapter8Ready();
+  completeE7Lab(e);
+  completeE7Ioc(e);
+  completeE7Sim(e);
+  return e;
+}
+
+function completeE8Lab(e: GameEngine) {
+  e.startMission("e8_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  run(e, "PC-MARIE", "ping 10.0.0.10");
+  e.sendChat("soc", "Paul isole, Marie DNS OK");
+}
+
+function completeE8Ir(e: GameEngine) {
+  e.startMission("e8_ir");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e8_ir.mailSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "PC-PAUL", "grep beacon /var/log/syslog");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  run(e, "PC-MARIE", "ping 10.0.0.10");
+  e.sendChat("soc", "containment OK, paie intacte");
+}
+
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
 {
   const e = newEngine();
@@ -1748,6 +1823,155 @@ console.log("\n[44] OLD SAVE — missing e6_lab runtime still starts after chapt
   e.startMission("e6_lab");
   assert(e.state.activeMissionId === "e6_lab", "e6_lab starts from a save that lacked SOC runtimes");
   assert(Array.isArray(e.state.world.socAlerts), "socAlerts hydrated");
+}
+
+console.log("\n[45] CHAPTER 9 LAB e7_lab");
+{
+  const e = completeChapter8Ready();
+  assert(e.state.missions["e7_lab"].status === "available", "e7_lab unlocked after chapter 8");
+  e.startMission("e7_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  const hashOut = run(e, "WS-001", `sha256sum ${SAMPLE_FILE}`).join("\n");
+  assert(hashOut.includes(SAMPLE_HASH), "sandbox hash printed");
+  const strOut = run(e, "WS-001", `strings ${SAMPLE_FILE}`).join("\n");
+  assert(strOut.includes("beacon"), "sandbox strings are a text extract");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  assert(!!e.state.world.hosts["PC-PAUL"]?.isolated, "PC-PAUL isolated");
+  const paulPing = run(e, "PC-PAUL", "ping 10.0.0.10").join("\n");
+  assert(allLoss(paulPing) || paulPing.toLowerCase().includes("filter") || paulPing.includes("100%"), "isolated host cannot ping DNS");
+  e.sendChat("soc", "isole hash lu");
+  assert(e.state.missions["e7_lab"].status === "completed", "e7_lab completed");
+  assert(e.state.badges.includes("sandbox_analyst"), "badge sandbox_analyst");
+}
+
+console.log("\n[45b] CHAPTER 9 ERROR — run sample");
+{
+  const e = completeChapter8Ready();
+  e.startMission("e7_lab");
+  assert(e.state.pendingDecision?.id === "e7_run", "run-sample decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["e7_lab"].errorKeys.includes("run_sample"), "run_sample recorded");
+  run(e, "WS-001", `sha256sum ${SAMPLE_FILE}`);
+  run(e, "WS-001", `strings ${SAMPLE_FILE}`);
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  e.sendChat("soc", "quand meme");
+  assert(e.state.missions["e7_lab"].status === "completed", "still completable");
+  assert(e.state.missions["e7_lab"].score < 100, "score penalized");
+}
+
+console.log("\n[46] CHAPTER 9 MISSION e7_ioc");
+{
+  const e = completeChapter8Ready();
+  completeE7Lab(e);
+  e.startMission("e7_ioc");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e7_ioc.mailSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "PC-PAUL", "grep beacon /var/log/syslog");
+  run(e, "WS-001", `ioc add ${SAMPLE_HASH}`);
+  assert((e.state.world.iocs ?? []).some((h) => h.includes("a4f3")), "IOC on watchlist");
+  e.sendChat("soc", "IOC pose");
+  assert(e.state.missions["e7_ioc"].status === "completed", "e7_ioc completed");
+}
+
+for (const variant of ["hash", "isolate", "ioc"] as const) {
+  console.log(`\n[47] SIM e7_sim variant=${variant}`);
+  const e = completeChapter8Ready();
+  completeE7Lab(e);
+  completeE7Ioc(e);
+  e.startMission("e7_sim", variant);
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.e7_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  if (variant === "hash") run(e, "WS-001", `sha256sum ${SAMPLE_FILE}`);
+  else if (variant === "isolate") run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  else run(e, "WS-001", `ioc add ${SAMPLE_HASH}`);
+  e.sendChat("soc", "rapport L2");
+  const s = e.state.missions["e7_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "Security Analyst"),
+    `[${variant}] Security Analyst certificate`
+  );
+  assert(e.state.chapter >= 10, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[48] CHAPTER 10 LAB e8_lab");
+{
+  const e = completeChapter9Ready();
+  assert(e.state.missions["e8_lab"].status === "available", "e8_lab unlocked after chapter 9");
+  e.startMission("e8_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  const marie = run(e, "PC-MARIE", "ping 10.0.0.10").join("\n");
+  assert(noLoss(marie), "Marie still reaches DNS");
+  e.sendChat("soc", "containment hote, paie OK");
+  assert(e.state.missions["e8_lab"].status === "completed", "e8_lab completed");
+}
+
+console.log("\n[48b] CHAPTER 10 ERROR — kill payroll");
+{
+  const e = completeChapter9Ready();
+  e.startMission("e8_lab");
+  assert(e.state.pendingDecision?.id === "e8_cut", "cut-finance decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["e8_lab"].errorKeys.includes("kill_payroll"), "kill_payroll recorded");
+  run(e, "RTR-HQ", "sudo iptables -D FW-IR-PAY");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  e.sendChat("soc", "paie retablie");
+  assert(e.state.missions["e8_lab"].status === "completed", "still completable");
+  assert(e.state.missions["e8_lab"].score < 100, "score penalized");
+}
+
+console.log("\n[49] CHAPTER 10 MISSION e8_ir");
+{
+  const e = completeChapter9Ready();
+  completeE8Lab(e);
+  e.startMission("e8_ir");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e8_ir.mailSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "PC-PAUL", "grep beacon /var/log/syslog");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  e.sendChat("soc", "timeline + isolate, paie intacte");
+  assert(e.state.missions["e8_ir"].status === "completed", "e8_ir completed");
+}
+
+for (const variant of ["isolate", "payroll", "comms"] as const) {
+  console.log(`\n[50] SIM e8_sim variant=${variant}`);
+  const e = completeChapter9Ready();
+  completeE8Lab(e);
+  completeE8Ir(e);
+  e.startMission("e8_sim", variant);
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.e8_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  if (variant === "isolate" || variant === "comms") {
+    run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  } else {
+    run(e, "RTR-HQ", "sudo iptables -D FW-IR-PAY");
+  }
+  e.sendChat("soc", "rapport IR");
+  const s = e.state.missions["e8_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "Incident Responder"),
+    `[${variant}] Incident Responder certificate`
+  );
+  assert(e.state.chapter >= 11, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[51] OLD SAVE — missing e7/e8 runtimes still start");
+{
+  const e = completeChapter8Ready();
+  delete e.state.missions["e7_lab"];
+  delete e.state.missions["e7_ioc"];
+  delete e.state.missions["e7_sim"];
+  e.startMission("e7_lab");
+  assert(e.state.activeMissionId === "e7_lab", "e7_lab starts from a save that lacked L2 runtimes");
+  assert(Array.isArray(e.state.world.iocs), "iocs hydrated");
 }
 
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);

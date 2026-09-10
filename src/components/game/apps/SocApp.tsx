@@ -1,6 +1,6 @@
 "use client";
 
-// HORIZON OS — SOC dashboard. Chapter 8 branchs a real SIEM queue.
+// HORIZON OS — SOC dashboard. Chapters 8–10 branch a real SIEM / EDR queue.
 import { useMemo, useState } from "react";
 import { useGame } from "../context";
 import { Icon, SEVERITY_COLOR, SeverityDot, fmtClock } from "../ui";

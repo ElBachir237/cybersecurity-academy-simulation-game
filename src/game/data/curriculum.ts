@@ -181,8 +181,22 @@ export const CHAPTERS: ChapterDef[] = [
     theoryKeys: ["e6_triage", "e6_logs", "e6_phish"],
     missionIds: ["e6_lab", "e6_phish", "e6_sim"],
   },
-  { id: 9, titleKey: "SOC L2", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 10, titleKey: "Incident Response", status: "soon", theoryKeys: [], missionIds: [] },
+  {
+    id: 9,
+    titleKey: "chapter9",
+    subKey: "chapter9",
+    status: "released",
+    theoryKeys: ["e7_sandbox", "e7_edr", "e7_ioc"],
+    missionIds: ["e7_lab", "e7_ioc", "e7_sim"],
+  },
+  {
+    id: 10,
+    titleKey: "chapter10",
+    subKey: "chapter10",
+    status: "released",
+    theoryKeys: ["e8_contain", "e8_payroll", "e8_comms"],
+    missionIds: ["e8_lab", "e8_ir", "e8_sim"],
+  },
   { id: 11, titleKey: "DFIR", status: "soon", theoryKeys: [], missionIds: [] },
 ];
 
@@ -208,6 +222,7 @@ export const BADGES: BadgeDef[] = [
   { id: "vendor_net", icon: "server", nameKey: "badges.vendor_net.name", descKey: "badges.vendor_net.desc" },
   { id: "rack_builder", icon: "layers", nameKey: "badges.rack_builder.name", descKey: "badges.rack_builder.desc" },
   { id: "soc_triage", icon: "shield", nameKey: "badges.soc_triage.name", descKey: "badges.soc_triage.desc" },
+  { id: "sandbox_analyst", icon: "search", nameKey: "badges.sandbox_analyst.name", descKey: "badges.sandbox_analyst.desc" },
 ];
 
 export interface TitleDef {
@@ -295,6 +310,20 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 8",
     missionIds: ["e6_lab", "e6_phish", "e6_sim"],
     skills: ["alert_triage", "siem", "log_analysis"],
+  },
+  {
+    id: "soc_l2",
+    titleKey: "Security Analyst",
+    level: "Chapter 9",
+    missionIds: ["e7_lab", "e7_ioc", "e7_sim"],
+    skills: ["malware_triage", "ioc", "threat_hunting"],
+  },
+  {
+    id: "ir_resp",
+    titleKey: "Incident Responder",
+    level: "Chapter 10",
+    missionIds: ["e8_lab", "e8_ir", "e8_sim"],
+    skills: ["incident_response", "defense_depth"],
   },
 ];
 

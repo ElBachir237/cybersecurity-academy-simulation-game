@@ -2,7 +2,7 @@
 import type { GameState, GameWorld, Severity } from "../types";
 
 export type SocAlertStatus = "open" | "fp" | "escalated";
-export type SocAlertKind = "noise" | "brute" | "phish";
+export type SocAlertKind = "noise" | "brute" | "phish" | "edr";
 
 export interface SocAlert {
   id: string;

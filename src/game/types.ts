@@ -95,6 +95,8 @@ export interface HostRuntime {
   nat?: { id: string; chain: string; action: string; outInterface?: string }[];
   /** UniFi gateway: isolate guest VLAN from corporate LAN. */
   guestIsolation?: boolean;
+  /** EDR containment: host cannot reach the rest of the network. */
+  isolated?: boolean;
 }
 
 export interface Ticket {
@@ -162,6 +164,8 @@ export interface GameWorld {
   directory?: Record<string, DirectoryUser>;
   workshop?: WorkshopState;
   socAlerts?: SocAlert[];
+  /** SOC L2 watchlist (hashes). */
+  iocs?: string[];
 }
 
 // ---------------- Mail / Chat / Notifications ----------------

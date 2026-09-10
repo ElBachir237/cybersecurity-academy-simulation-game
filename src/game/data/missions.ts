@@ -37,6 +37,8 @@ import { c5_ad, c5_lab, c5_sim, c5_web } from "./missionsChapter5";
 import { c6_lab, c6_mt, c6_sim, c6_unifi } from "./missionsChapter6";
 import { e5_lab, e5_sim, e5_site } from "./missionsChapterE5";
 import { e6_lab, e6_phish, e6_sim } from "./missionsChapterE6";
+import { e7_ioc, e7_lab, e7_sim } from "./missionsChapterE7";
+import { e8_ir, e8_lab, e8_sim } from "./missionsChapterE8";
 
 // ---------------- event matching helpers ----------------
 const baseCmd = (e: EngineEvent): string | undefined => {
@@ -2654,6 +2656,12 @@ export const MISSIONS: Record<string, MissionDef> = {
   e6_lab,
   e6_phish,
   e6_sim,
+  e7_lab,
+  e7_ioc,
+  e7_sim,
+  e8_lab,
+  e8_ir,
+  e8_sim,
 };
 
 export function getMission(id: string): MissionDef | undefined {
@@ -2690,6 +2698,12 @@ export const MISSION_ORDER = [
   "e6_lab",
   "e6_phish",
   "e6_sim",
+  "e7_lab",
+  "e7_ioc",
+  "e7_sim",
+  "e8_lab",
+  "e8_ir",
+  "e8_sim",
 ];
 
 export function pickSimVariant(attempts: number): string {

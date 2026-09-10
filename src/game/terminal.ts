@@ -38,6 +38,13 @@ import {
   isLabHost,
   workshopConnected,
 } from "./data/workshop";
+import {
+  SAMPLE_HASH,
+  SAMPLE_PATH,
+  SAMPLE_STRINGS,
+  SAMPLE_TEXT,
+  isSamplePath,
+} from "./data/defend";
 
 export interface TermSignals {
   cmd: string;
@@ -132,7 +139,9 @@ function pathTo(target: string, host: HostRuntime, state: GameState): PathResult
   if (!iface || iface.state !== "up" || !iface.ip) return "no-iface";
   if (target === iface.ip) return "ok";
   if (target.startsWith("127.")) return "ok";
+  if (host.isolated) return "filtered";
   const destId = findHostIdByIp(target, state);
+  if (destId && state.world.hosts[destId]?.isolated) return "filtered";
   if (isLabHost(host.id) || (destId && isLabHost(destId))) {
     if (!destId || !workshopConnected(host.id, destId, state)) return "no-route";
   }
@@ -250,6 +259,8 @@ function readFileInternal(path: string, host: HostRuntime, state: GameState): st
       );
       return auth.length ? auth.join("\n") + "\n" : "";
     }
+    case "/opt/horizon/sandbox/sample.quarantine":
+      return SAMPLE_TEXT;
     case "/home/student/README.txt":
       return [
         "Bienvenue sur votre poste HORIZON.",
@@ -830,6 +841,60 @@ function cmdJournalctl(args: string[], host: HostRuntime): string[] {
   const unit = uIdx >= 0 ? (args[uIdx + 1] ?? "").replace(/\.service$/, "") : "";
   const lines = host.logs.filter((l) => !unit || l.toLowerCase().includes(unit.toLowerCase()));
   return lines.length ? lines.slice(-20) : ["-- No entries --"];
+}
+
+function resolveEdrTarget(arg: string | undefined, fallback: string, state: GameState): string | null {
+  const raw = (arg ?? fallback).toUpperCase();
+  if (state.world.hosts[raw]) return raw;
+  const byLabel = Object.keys(state.world.hosts).find((id) => id.toUpperCase() === raw);
+  return byLabel ?? null;
+}
+
+function cmdEdr(
+  args: string[],
+  host: HostRuntime,
+  state: GameState,
+  sudo: boolean,
+  t: TFn
+): string[] {
+  const sub = (args[0] ?? "status").toLowerCase();
+  if (sub === "status") {
+    const id = resolveEdrTarget(args[1], host.id, state);
+    if (!id) return ["edr: host introuvable"];
+    const h = state.world.hosts[id];
+    return [
+      `EDR ${id}  os=${h.os}`,
+      `containment: ${h.isolated ? "ISOLATED" : "off"}`,
+      `sample: ${SAMPLE_PATH}`,
+    ];
+  }
+  if (sub === "isolate" || sub === "release") {
+    if (!sudo) return [t("terminal.permissionDenied")];
+    const id = resolveEdrTarget(args[1], host.id, state);
+    if (!id) return ["edr: usage: sudo edr isolate|release <host>"];
+    const h = state.world.hosts[id];
+    h.isolated = sub === "isolate";
+    h.logs.push(`Sep 12 edr: containment ${h.isolated ? "isolated" : "released"}`);
+    return [`edr: ${id} ${h.isolated ? "isolated" : "released"}`];
+  }
+  return ["edr: usage: edr status [host] | sudo edr isolate|release <host>"];
+}
+
+function cmdIoc(args: string[], state: GameState): string[] {
+  const sub = (args[0] ?? "list").toLowerCase();
+  if (!state.world.iocs) state.world.iocs = [];
+  if (sub === "list") {
+    return state.world.iocs.length
+      ? state.world.iocs.map((h) => h)
+      : ["(watchlist empty)"];
+  }
+  if (sub === "add") {
+    const hash = (args[1] ?? "").toLowerCase();
+    if (hash.length < 8) return ["ioc: usage: ioc add <sha256>"];
+    if (!state.world.iocs.some((h) => h.toLowerCase() === hash)) state.world.iocs.push(hash);
+    return [`ioc: added ${hash}`];
+  }
+  return ["ioc: usage: ioc list | ioc add <sha256>"];
 }
 
 function ifaceByName(host: HostRuntime, name: string): string | undefined {
@@ -1532,6 +1597,9 @@ export function execTerminal(
       out.push("  sudo ln -s .../sites-available/<vhost> .../sites-enabled/");
       out.push("  samba-tool user list|create|show|unlock  — AD simulé (SRV-DC)");
       out.push("  journalctl -u <svc>                  — journaux systemd");
+      out.push("  sha256sum | strings <fichier>        — sandbox (extrait texte)");
+      out.push("  sudo edr status|isolate|release <hôte> — containment EDR");
+      out.push("  ioc list | ioc add <hash>            — watchlist SOC");
       out.push("  sudo nginx -t                        — tester la config nginx");
       out.push("  show vlan | show interfaces status   — ports du commutateur (SW-01)");
       out.push("  sudo switchport Gi0/14 vlan 40       — VLAN d'accès (SW-01)");
@@ -1612,6 +1680,10 @@ export function execTerminal(
         out.push("01-netcfg.yaml");
       } else if (path === "/var/log") {
         out.push("syslog  auth.log  apt  dpkg.log");
+      } else if (path === "/opt" || path === "/opt/horizon") {
+        out.push("sandbox");
+      } else if (path === "/opt/horizon/sandbox") {
+        out.push("sample.quarantine");
       } else if (path === "/etc") {
         out.push("hostname  hosts  netplan  nginx  os-release  resolv.conf");
       } else if (path === "/etc/nginx") {
@@ -1731,6 +1803,32 @@ export function execTerminal(
       break;
     case "journalctl":
       out.push(...cmdJournalctl(args, host));
+      break;
+    case "sha256sum": {
+      const file = args.find((a) => !a.startsWith("-")) ?? SAMPLE_PATH;
+      if (isSamplePath(file)) out.push(`${SAMPLE_HASH}  ${SAMPLE_PATH}`);
+      else {
+        const content = readFileInternal(file, host, state);
+        if (content === null) out.push(`sha256sum: ${t("terminal.noSuchFile", { path: file })}`);
+        else out.push(`(sandbox) ${file}: not a quarantined sample`);
+      }
+      break;
+    }
+    case "strings": {
+      const file = args.find((a) => !a.startsWith("-")) ?? SAMPLE_PATH;
+      if (isSamplePath(file)) out.push(...SAMPLE_STRINGS);
+      else {
+        const content = readFileInternal(file, host, state);
+        if (content === null) out.push(`strings: ${t("terminal.noSuchFile", { path: file })}`);
+        else out.push(...content.split("\n").filter(Boolean).slice(0, 20));
+      }
+      break;
+    }
+    case "edr":
+      out.push(...cmdEdr(args, host, state, sudo, t));
+      break;
+    case "ioc":
+      out.push(...cmdIoc(args, state));
       break;
     case "nginx":
       if (args[0] === "-t" || args[0] === "-t") {

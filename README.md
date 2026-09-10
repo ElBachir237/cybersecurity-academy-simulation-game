@@ -34,7 +34,7 @@ Un bureau **HORIZON OS** avec des fenêtres, des notifications, du son, et une s
 | **Chat** | IT-SUPPORT, collègues, appels / décisions |
 | **Terminal** | Shell Linux cohérent avec l’état du monde |
 | **Network** | Topologie, hôtes, calculateur CIDR |
-| **SOC** | File SIEM, triage L1, escalade (ch. 8) |
+| **SOC** | File SIEM, triage L1, alerte EDR, escalade (ch. 8–10) |
 | **Files / Tickets / Browser** | Contexte d’entreprise |
 | **Skills / Portfolio** | Compétences, badges, certificats, dossier de carrière |
 
@@ -58,7 +58,7 @@ Ce sont des commandes **d’exploitation légitime** (admin, diag, durcissement)
 
 ## Campagne actuelle
 
-Le curriculum **jouable** aujourd’hui : chapitres **1 à 8**. La vision carrière (SOC L2 → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 9–11 en « à venir ».
+Le curriculum **jouable** aujourd’hui : chapitres **1 à 10**. La vision carrière (DFIR → architecte / GRC) est décrite plus bas ; l’Académie affiche le palier 11 en « à venir ».
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -173,6 +173,34 @@ Commandes / UI : boutons Faux positif / Escalader dans le SOC ; `journalctl -u s
 
 Réussir le chapitre débloque le certificat **SOC Analyst L1**.
 
+### Chapitre 9 — SOC L2 (`released`)
+
+Sandbox **texte**, pas d’exécutable. Hash, strings, isolation EDR, watchlist IOC. On n’exécute rien.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Le hash en quarantaine** (`e7_lab`) | Lab | `sha256sum` + `strings` sur `/opt/horizon/sandbox/sample.quarantine` ; `sudo edr isolate PC-PAUL` ; lancer le sample = `run_sample` |
+| **La watchlist** (`e7_ioc`) | Mission | Hunting logs PC-PAUL ; `ioc add <sha256>` ; coller le hash sur GENERAL = `leak_ioc` |
+| **Simulation : quart L2** (`e7_sim`) | Simulation | Variantes `hash` / `isolate` / `ioc` |
+
+Commandes : `sha256sum` / `strings` (extrait narré) ; `sudo edr isolate|release|status PC-PAUL` ; `ioc list` / `ioc add`. Un hôte isolé ping en 100 % de perte. Rapport sur le canal **SOC**.
+
+Réussir le chapitre débloque le certificat **Security Analyst**.
+
+### Chapitre 10 — Réponse à incident (`released`)
+
+Isoler **PC-PAUL** (logistique). Ne pas tuer la paie (`PC-MARIE` → `10.0.0.10`). Dire vrai au SOC, pas « RAS » sur GENERAL.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Contenir sans tuer la paie** (`e8_lab`) | Lab | `edr isolate PC-PAUL` ; ping Marie DNS OK ; DROP VLAN 20 = `kill_payroll` (règle `FW-IR-PAY`) |
+| **Timeline et parole** (`e8_ir`) | Mission | Timeline logs ; comms SOC ; RAS / « tout va bien » sur GENERAL = `all_clear` ; Marc coupe tout = `kill_payroll` |
+| **Simulation : IR** (`e8_sim`) | Simulation | Variantes `isolate` / `payroll` / `comms` |
+
+Commandes : `sudo edr isolate PC-PAUL` ; `sudo iptables -D FW-IR-PAY` si la paie a été coupée ; `ping 10.0.0.10` depuis `PC-MARIE`. Rapport sur le canal **SOC**.
+
+Réussir le chapitre débloque le certificat **Incident Responder**.
+
 ---
 
 ## Vision : une carrière, pas un catalogue
@@ -257,13 +285,15 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Skills :** `alert_triage`, `siem`, `log_analysis`. Certificat : **SOC Analyst L1**. L’app SOC se remplit pour de vrai. **Co-op** possible (helpdesk + L1).
 
-### Chapitre 9 — Analyste / SOC L2
+### Chapitre 9 — Analyste / SOC L2 (`released`)
 
 **But :** plus d’autonomie : endpoint (EDR **simulé**), hunting léger, malware en **sandbox** (pas d’exécutable).
 
+**Objectif :** hasher l’extrait quarantaine, isoler `PC-PAUL`, poser l’IOC — jamais lancer le sample.
+
 **Skills :** `log_analysis`, `malware_triage`, `ioc`, `threat_hunting`. Certificat : **Security Analyst**.
 
-### Chapitre 10 — Réponse à incident
+### Chapitre 10 — Réponse à incident (`released`)
 
 **But :** contenir, communiquer, timeline — sous pression (timer, direction).
 
@@ -329,12 +359,12 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | **Fait** |
 | **E6** | Ch. 8 SOC L1 + app SOC branchée + timer | **Fait** |
 | **E7** | Co-op 2 joueurs (helpdesk + SOC) + vue formateur | Travail en équipe |
-| **E8** | Ch. 9–11 (L2, IR, DFIR) dans l’ordre | Analyste → DFIR |
+| **E8** | Ch. 9–11 (L2, IR, DFIR) dans l’ordre | **9–10 faits** ; DFIR reste |
 | **E9** | Ch. 11–12 (web défense, cloud HORIZON) | Ingénieur |
 | **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
 | **E11** | Ch. 14–15 GRC + capstone | Management / expert |
 
-**Prochaine implémentation :** étape **E7** (co-op helpdesk + SOC). Pas l’atelier 5★.
+**Prochaine implémentation :** chapitre **11 DFIR** (fin E8). Le co-op (E7) reste au plan. Pas l’atelier 5★.
 
 ---
 
@@ -500,13 +530,13 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | Couche | Maturité |
 | --- | --- |
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
-| Moteur + terminal | Solide pour les ch. 1–8 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier, SIEM L1) |
-| Contenu jouable | Chapitres 1–8 (labs + tickets + exams à variantes + atelier palier 1 + SOC L1) |
-| Curriculum carrière (ch. 9–16, SOC L2, atelier 5★) | Vision écrite, pas encore jouable |
-| SOC L1, certificats serveur, classe | File SIEM jouable ; co-op à venir |
+| Moteur + terminal | Solide pour les ch. 1–10 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier, SIEM, EDR / IOC) |
+| Contenu jouable | Chapitres 1–10 (labs + tickets + exams à variantes + atelier palier 1 + SOC L1/L2 + IR) |
+| Curriculum carrière (ch. 11–16, DFIR, atelier 5★) | Vision écrite, pas encore jouable |
+| SOC L1–L2, IR, certificats serveur, classe | File SIEM + sandbox/EDR jouables ; co-op à venir |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est un **début de carrière IT** (helpdesk → adressage → segmentation → Windows / Wi-Fi → systèmes → pfSense / MikroTik / UniFi → atelier palier 1 → **SOC L1**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (SOC L2, architecture 5★). La suite utile : **E7**.
+Le prototype est un **début de carrière IT** (helpdesk → adressage → segmentation → Windows / Wi-Fi → systèmes → pfSense / MikroTik / UniFi → atelier palier 1 → **SOC L1 → SOC L2 → IR**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (DFIR, architecture 5★). La suite utile : **chapitre 11 DFIR**.
 
 ---
 
