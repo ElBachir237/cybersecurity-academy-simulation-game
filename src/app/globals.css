@@ -1,0 +1,312 @@
+@import "tailwindcss";
+@import "./workspace.css";
+
+@theme {
+  --color-hz-bg: #070b14;
+  --color-hz-panel: #0d1424;
+  --color-hz-panel2: #111a30;
+  --color-hz-border: #1c2947;
+  --color-hz-text: #dbe4f4;
+  --color-hz-muted: #7d8bab;
+  --color-hz-accent: #35e0d2;
+  --color-hz-cyan: #38bdf8;
+  --color-hz-green: #34d399;
+  --color-hz-amber: #fbbf24;
+  --color-hz-red: #f87171;
+  --color-hz-violet: #a78bfa;
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, "SFMono-Regular",
+    Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--color-hz-bg);
+  color: var(--color-hz-text);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #243354 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #243354;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::selection {
+  background: rgba(53, 224, 210, 0.25);
+}
+
+/* ---------- decorative ---------- */
+.hz-grid-bg {
+  background-image: linear-gradient(rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.hz-glow {
+  background: radial-gradient(
+    ellipse 60% 45% at 50% 0%,
+    rgba(56, 189, 248, 0.14),
+    transparent 70%
+  );
+}
+
+.term-glow {
+  text-shadow: 0 0 6px rgba(52, 211, 153, 0.45);
+}
+
+/* ---------- animations ---------- */
+@keyframes hz-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes hz-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hz-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes hz-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+}
+@keyframes hz-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes hz-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(53, 224, 210, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(53, 224, 210, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(53, 224, 210, 0);
+  }
+}
+@keyframes hz-scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(400%);
+  }
+}
+@keyframes hz-phone {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-18deg);
+  }
+  40% {
+    transform: rotate(14deg);
+  }
+  60% {
+    transform: rotate(-10deg);
+  }
+  80% {
+    transform: rotate(6deg);
+  }
+}
+@keyframes hz-typing {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.anim-fade-up {
+  animation: hz-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.anim-fade-in {
+  animation: hz-fade-in 0.4s ease both;
+}
+.anim-slide-right {
+  animation: hz-slide-in-right 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.anim-pulse-dot {
+  animation: hz-pulse-dot 1.6s ease-in-out infinite;
+}
+.anim-blink {
+  animation: hz-blink 1s step-end infinite;
+}
+.anim-ring {
+  animation: hz-ring 1.8s ease-out infinite;
+}
+.anim-phone {
+  animation: hz-phone 0.9s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+.typing-dot {
+  animation: hz-typing 1.1s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.hz-scanline-decoration {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.hz-scanline-decoration::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 25%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(53, 224, 210, 0.05),
+    transparent
+  );
+  animation: hz-scanline 7s linear infinite;
+}
+
+/* ---------- shared controls ---------- */
+.hz-input {
+  min-width: 0;
+  max-width: 100%;
+  background: rgba(7, 11, 20, 0.7);
+  border: 1px solid var(--color-hz-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--color-hz-text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.hz-input:focus {
+  border-color: var(--color-hz-accent);
+  box-shadow: 0 0 0 3px rgba(53, 224, 210, 0.12);
+}
+
+.hz-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: transform 0.12s ease, background 0.15s ease, opacity 0.15s;
+  cursor: pointer;
+  user-select: none;
+}
+.hz-btn:active {
+  transform: scale(0.97);
+}
+.hz-btn-primary {
+  background: linear-gradient(135deg, #0ea5a0, #0891b2);
+  color: #041016;
+}
+.hz-btn-primary:hover {
+  filter: brightness(1.1);
+}
+.hz-btn-ghost {
+  background: rgba(36, 51, 84, 0.35);
+  color: var(--color-hz-text);
+  border: 1px solid var(--color-hz-border);
+}
+.hz-btn-ghost:hover {
+  background: rgba(36, 51, 84, 0.6);
+}
+.hz-btn-danger {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--color-hz-red);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.hz-card {
+  background: var(--color-hz-panel);
+  border: 1px solid var(--color-hz-border);
+  border-radius: 12px;
+}
+
+.term-text {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.no-select {
+  user-select: none;
+}
+
+/* Native editing and keyboard focus remain visible, even in resized windows. */
+button:focus-visible, a:focus-visible, select:focus-visible, [tabindex="0"]:focus-visible {
+  outline: 2px solid #73d8c1;
+  outline-offset: 3px;
+}
+.hz-terminal-input:focus-visible, .hz-editor-textarea:focus-visible {
+  outline: none;
+}
+input, textarea { user-select: text; }
+button:disabled { cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
