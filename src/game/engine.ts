@@ -62,6 +62,8 @@ const DHCP_LEASES: Record<string, [string, number, string]> = {
   "WS-001": ["192.168.10.24", 24, "192.168.10.1"],
   "PC-MARIE": ["192.168.20.45", 24, "192.168.20.1"],
   "PC-PAUL": ["192.168.30.37", 24, "192.168.30.1"],
+  "PC-WIN": ["192.168.10.55", 24, "192.168.10.1"],
+  "PC-AMINA": ["192.168.10.61", 24, "192.168.10.1"],
 };
 
 function uid(prefix = "id"): string {
@@ -161,6 +163,7 @@ export function createInitialState(profile: Profile): GameState {
         paul: { id: "paul", mood: "neutral" },
         soriya: { id: "soriya", mood: "neutral" },
         nour: { id: "nour", mood: "neutral" },
+        amina: { id: "amina", mood: "neutral" },
       },
     },
     vfs: {},
@@ -224,6 +227,9 @@ export function hydrateProgression(state: GameState): GameState {
       ...seed,
       ...existing,
       ifaces: { ...seed.ifaces, ...existing.ifaces },
+      wifiAp: existing.wifiAp ?? seed.wifiAp,
+      wifiClient: existing.wifiClient ?? seed.wifiClient,
+      accounts: existing.accounts ?? seed.accounts,
     };
   }
   const missions = { ...(state.missions ?? {}) };
@@ -243,6 +249,7 @@ export function hydrateProgression(state: GameState): GameState {
   }
   const npc = { ...(state.world?.npc ?? {}) };
   if (!npc.nour) npc.nour = { id: "nour", mood: "neutral" };
+  if (!npc.amina) npc.amina = { id: "amina", mood: "neutral" };
   const existingRules = state.world?.fwRules;
   let fwRules = Array.isArray(existingRules) ? existingRules : seedFwRules();
   if (!fwRules.some((r) => r.id === "FW-CORE")) {
@@ -257,6 +264,7 @@ export function hydrateProgression(state: GameState): GameState {
   if (completed.has("c1_sim")) chapter = Math.max(chapter, 2);
   if (completed.has("c2_sim")) chapter = Math.max(chapter, 3);
   if (completed.has("c3_sim")) chapter = Math.max(chapter, 4);
+  if (completed.has("c4_sim")) chapter = Math.max(chapter, 5);
   return {
     ...state,
     chapter,
@@ -1134,6 +1142,7 @@ export class GameEngine {
     if (this.state.completedMissions.includes("c1_sim")) this.state.chapter = Math.max(this.state.chapter, 2);
     if (this.state.completedMissions.includes("c2_sim")) this.state.chapter = Math.max(this.state.chapter, 3);
     if (this.state.completedMissions.includes("c3_sim")) this.state.chapter = Math.max(this.state.chapter, 4);
+    if (this.state.completedMissions.includes("c4_sim")) this.state.chapter = Math.max(this.state.chapter, 5);
 
     this.recomputeRecommendation();
     this.state.activeMissionId = null;

@@ -14,9 +14,14 @@ export default function AcademyApp() {
   const lang = state.profile?.lang ?? "fr";
   const fr = lang === "fr";
   const chapter = CHAPTERS.find((item) => item.id === chapterId) ?? CHAPTERS[0];
-  const title = (id: number) =>
-    id === 2 ? t("chapter2.title") : id === 3 ? t("chapter3.title") : CHAPTERS.find((item) => item.id === id)?.titleKey ?? "";
-  const subtitle = chapter.id === 2 ? t("chapter2.sub") : chapter.id === 3 ? t("chapter3.sub") : t("academy.sub");
+  const title = (id: number) => {
+    const key = `chapter${id}.title`;
+    const value = t(key);
+    return value === key ? CHAPTERS.find((item) => item.id === id)?.titleKey ?? "" : value;
+  };
+  const subtitleKey = `chapter${chapter.id}.sub`;
+  const subtitleValue = t(subtitleKey);
+  const subtitle = subtitleValue === subtitleKey ? t("academy.sub") : subtitleValue;
   const completed = chapter.missionIds.filter((id) => state.completedMissions.includes(id)).length;
   const brief = briefing ? MISSIONS[briefing] : null;
   const prereqOk = (id: string) => {

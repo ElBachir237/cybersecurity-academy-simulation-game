@@ -24,6 +24,10 @@ export default function TerminalApp() {
   const live = useRef({ overlayCount });
   live.current = { overlayCount };
   const host = state.world.hosts[hostId];
+  const winShell = /windows/i.test(host?.os ?? "");
+  const apShell = /unifi|ubiquiti/i.test(host?.os ?? "");
+  const promptHost = winShell ? `${hostId}` : apShell ? `${hostId}` : `student@${hostId.toLowerCase()}`;
+  const promptSymbol = winShell ? ">" : apShell ? "#" : "❯";
   const blocks = session?.blocks ?? EMPTY_BLOCKS;
   const draft = session?.draft ?? "";
   const fr = state.profile?.lang !== "en";
@@ -188,7 +192,7 @@ export default function TerminalApp() {
           <p key={block.id} className="hz-terminal-editor-note">{block.output.join("\n")}</p>
         ) : (
           <section key={block.id} className="hz-command-block">
-            <div className="hz-command-prompt"><span>student@{hostId.toLowerCase()}</span><b aria-hidden="true">❯</b><code>{block.command}</code></div>
+            <div className="hz-command-prompt"><span>{promptHost}</span><b aria-hidden="true">{promptSymbol}</b><code>{block.command}</code></div>
             {block.output.map((line, index) => <div
               key={index}
               className={`hz-command-result ${/failed|failure|introuvable|refused|refusée|échec|unreachable|invalide/i.test(line) ? "is-error" : ""}`}
@@ -204,8 +208,8 @@ export default function TerminalApp() {
         <div className="hz-terminal-input-row" onClick={(event) => {
           if (event.target === event.currentTarget) focusInput();
         }}>
-          <label htmlFor="terminal-command" className="hz-terminal-prompt-host">student@{hostId.toLowerCase()}</label>
-          <span className="hz-terminal-prompt-symbol" aria-hidden="true">❯</span>
+          <label htmlFor="terminal-command" className="hz-terminal-prompt-host">{promptHost}</label>
+          <span className="hz-terminal-prompt-symbol" aria-hidden="true">{promptSymbol}</span>
           <input
             id="terminal-command"
             ref={inputRef}

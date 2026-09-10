@@ -57,6 +57,23 @@ export interface IfaceRuntime {
   gw?: string;
 }
 
+export interface WifiApConfig {
+  ssid: string;
+  vlan: number;
+  enabled: boolean;
+}
+
+export interface WifiClientConfig {
+  ssid: string | null;
+  connected: boolean;
+}
+
+export interface LocalAccount {
+  name: string;
+  locked: boolean;
+  active: boolean;
+}
+
 export interface HostRuntime {
   id: string;
   ifaces: Record<string, IfaceRuntime>;
@@ -67,6 +84,9 @@ export interface HostRuntime {
   label: string;
   os: string;
   room: string;
+  wifiAp?: WifiApConfig;
+  wifiClient?: WifiClientConfig;
+  accounts?: Record<string, LocalAccount>;
 }
 
 export interface Ticket {

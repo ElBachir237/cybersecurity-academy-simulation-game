@@ -9,12 +9,12 @@ import { readHostFile } from "../src/game/terminal";
 import type { Profile } from "../src/game/types";
 
 function noLoss(out: string): boolean {
-  // FR: "0% de perte" / EN: "0% packet loss"
-  return out.includes("0% de perte") || out.includes("0% packet loss");
+  // FR: "0% de perte" / EN: "0% packet loss" / Windows: "Lost = 0"
+  return out.includes("0% de perte") || out.includes("0% packet loss") || out.includes("Lost = 0");
 }
 
 function allLoss(out: string): boolean {
-  return out.includes("100%") && (out.includes("perte") || out.includes("packet loss"));
+  return out.includes("100%") && (out.includes("perte") || out.includes("packet loss") || out.includes("loss"));
 }
 
 let failures = 0;
@@ -366,6 +366,78 @@ function completeC3ThroughNat(e: GameEngine) {
   completeC3Lab(e);
   completeC3Port(e);
   completeC3Nat(e);
+}
+
+function completeC3Mission(e: GameEngine) {
+  e.startMission("c3_mission");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c3_mission.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo iptables -L");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo iptables -D FW-VENDOR");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+  e.sendChat("itsupport", "FORWARD ok");
+}
+
+function completeChapter3(e: GameEngine) {
+  completeC3ThroughNat(e);
+  completeC3Mission(e);
+  e.startMission("c3_sim", "any");
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c3_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo iptables -L");
+  run(e, "WS-001", "sudo iptables -D FW-HOLE");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+  e.sendChat("itsupport", "rapport: trou FORWARD fermé");
+}
+
+function completeChapter3Ready(): GameEngine {
+  const e = completeChapter2Ready();
+  completeChapter3(e);
+  return e;
+}
+
+function completeC4Lab(e: GameEngine) {
+  e.startMission("c4_lab");
+  run(e, "PC-WIN", "help");
+  run(e, "PC-WIN", "ipconfig");
+  run(e, "PC-WIN", "ping 192.168.10.1");
+  run(e, "PC-WIN", "ping 10.0.0.10");
+  run(e, "PC-WIN", "ping intranet.horizon");
+  run(e, "PC-WIN", "ipconfig /all");
+  run(e, "PC-WIN", "netsh interface ipv4 set dnsservers name=Ethernet static 10.0.0.10");
+  run(e, "PC-WIN", "ping intranet.horizon");
+}
+
+function completeC4Wifi(e: GameEngine) {
+  e.startMission("c4_wifi");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.c4_wifi.mailTicketSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "AP-01", "info");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "AP-01", "set-ssid HORIZON-CORP");
+  run(e, "AP-01", "set-vlan 10");
+  run(e, "PC-AMINA", "netsh wlan connect name=HORIZON-CORP");
+  run(e, "PC-AMINA", "ping intranet.horizon");
+  e.sendChat("itsupport", "SSID CORP VLAN 10");
+}
+
+function completeC4Desk(e: GameEngine) {
+  e.startMission("c4_desk");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.c4_desk.mailTicketSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "PC-AMINA", "net user amina");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "PC-AMINA", "net user amina /active:yes");
+  run(e, "PC-AMINA", "net start spooler");
+  run(e, "PC-AMINA", "ping 192.168.10.88");
+  e.sendChat("itsupport", "compte et spooler ok");
 }
 
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
@@ -732,6 +804,135 @@ console.log("\n[18] OLD SAVE — missing c3_mission runtime still starts and get
     "ticket mail created on hydrated start"
   );
   assert(e.state.activeWindow === "mail", "mail workspace opened");
+}
+
+console.log("\n[19] CHAPTER 4 LAB c4_lab");
+{
+  const e = completeChapter3Ready();
+  assert(e.state.missions["c4_lab"].status === "available", "c4_lab unlocked after chapter 3");
+  assert(e.state.world.hosts["PC-WIN"]?.os.includes("Windows"), "PC-WIN exists on hydrated world");
+  completeC4Lab(e);
+  assert(e.state.missions["c4_lab"].status === "completed", "c4_lab completed");
+  assert(e.state.world.hosts["PC-WIN"]?.dns[0] === "10.0.0.10", "Windows DNS set via netsh");
+  assert(e.state.missions["c4_wifi"].status === "available", "c4_wifi unlocked");
+}
+
+console.log("\n[20] CHAPTER 4 WIFI c4_wifi");
+{
+  const e = completeChapter3Ready();
+  completeC4Lab(e);
+  e.startMission("c4_wifi");
+  assert(e.state.activeMissionId === "c4_wifi", "c4_wifi started");
+  assert(e.state.world.hosts["AP-01"]?.wifiAp?.ssid === "HORIZON-GUEST", "AP starts on guest SSID");
+  assert(e.state.pendingDecision === null, "call waits until mail is read");
+  const isolated = run(e, "PC-AMINA", "ping intranet.horizon").join("\n");
+  assert(allLoss(isolated) || isolated.toLowerCase().includes("host") || isolated.includes("find host"), "guest Wi-Fi cannot resolve intranet");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c4_wifi.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  const info = run(e, "AP-01", "info").join("\n");
+  assert(info.includes("HORIZON-GUEST"), "AP info shows guest SSID");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "AP-01", "set-ssid HORIZON-CORP");
+  run(e, "AP-01", "set-vlan 10");
+  assert(e.state.world.hosts["AP-01"]?.wifiAp?.ssid === "HORIZON-CORP", "SSID restored");
+  assert(e.state.world.hosts["AP-01"]?.wifiAp?.vlan === 10, "VLAN 10 restored");
+  run(e, "PC-AMINA", "netsh wlan connect name=HORIZON-CORP");
+  const ok = run(e, "PC-AMINA", "ping intranet.horizon").join("\n");
+  assert(noLoss(ok), "intranet reachable after corp Wi-Fi");
+  e.sendChat("itsupport", "Wi-Fi métier ok");
+  assert(e.state.missions["c4_wifi"].status === "completed", "c4_wifi completed");
+  assert(e.state.missions["c4_desk"].status === "available", "c4_desk unlocked");
+}
+
+console.log("\n[21] CHAPTER 4 DESK c4_desk");
+{
+  const e = completeChapter3Ready();
+  completeC4Lab(e);
+  completeC4Wifi(e);
+  e.startMission("c4_desk");
+  assert(e.state.world.hosts["PC-AMINA"]?.accounts?.amina?.locked === true, "account starts locked");
+  assert(e.state.world.hosts["PC-AMINA"]?.services.spooler === "inactive", "spooler stopped");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c4_desk.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  const listed = run(e, "PC-AMINA", "net user amina").join("\n");
+  assert(listed.includes("Lockout") || listed.includes("Account active"), "net user shows account");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "PC-AMINA", "net user amina /active:yes");
+  assert(e.state.world.hosts["PC-AMINA"]?.accounts?.amina?.active === true, "account unlocked");
+  run(e, "PC-AMINA", "net start spooler");
+  assert(e.state.world.hosts["PC-AMINA"]?.services.spooler === "active", "spooler running");
+  const prn = run(e, "PC-AMINA", "ping 192.168.10.88").join("\n");
+  assert(noLoss(prn), "printer reachable");
+  e.sendChat("itsupport", "session et imprimante ok");
+  assert(e.state.missions["c4_desk"].status === "completed", "c4_desk completed");
+  assert(e.state.missions["c4_sim"].status === "available", "c4_sim unlocked");
+}
+
+console.log("\n[21b] CHAPTER 4 ERROR — password in chat");
+{
+  const e = completeChapter3Ready();
+  completeC4Lab(e);
+  completeC4Wifi(e);
+  e.startMission("c4_desk");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c4_desk.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "PC-AMINA", "net user amina");
+  assert(e.state.pendingDecision?.id === "c4d_pwd", "password decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["c4_desk"].errorKeys.includes("password_on_chat"), "error recorded");
+  run(e, "PC-AMINA", "net user amina /active:yes");
+  run(e, "PC-AMINA", "net start spooler");
+  run(e, "PC-AMINA", "ping 192.168.10.88");
+  e.sendChat("itsupport", "corrigé malgré tout");
+  assert(e.state.missions["c4_desk"].status === "completed", "still completable");
+  assert(e.state.missions["c4_desk"].score < 100, "score penalized");
+}
+
+for (const variant of ["link", "ip", "wifi"] as const) {
+  console.log(`\n[22] SIM c4_sim variant=${variant}`);
+  const e = completeChapter3Ready();
+  completeC4Lab(e);
+  completeC4Wifi(e);
+  completeC4Desk(e);
+  e.startMission("c4_sim", variant);
+  assert(e.state.missions["c4_sim"].variant === variant, `variant is ${variant}`);
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c4_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  run(e, "PC-WIN", "ipconfig /all");
+  if (variant === "link") {
+    run(e, "PC-WIN", 'netsh interface set interface name=Ethernet admin=ENABLED');
+  } else if (variant === "ip") {
+    run(e, "PC-WIN", "netsh interface ipv4 set address name=Ethernet static 192.168.10.55 255.255.255.0 192.168.10.1");
+  } else {
+    run(e, "PC-WIN", "netsh wlan connect name=HORIZON-CORP");
+  }
+  const verify = run(e, "PC-WIN", "ping intranet.horizon").join("\n");
+  assert(noLoss(verify), `[${variant}] intranet verified`);
+  e.sendChat("itsupport", "rapport: PC-WIN ok");
+  const s = e.state.missions["c4_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed (status=${s.status})`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "Service Desk Associate"),
+    `[${variant}] Service Desk Associate certificate`
+  );
+  assert(e.state.chapter >= 5, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[23] OLD SAVE — missing c4_lab runtime still starts after chapter 3");
+{
+  const e = completeChapter3Ready();
+  delete e.state.missions["c4_lab"];
+  delete e.state.missions["c4_wifi"];
+  delete e.state.missions["c4_desk"];
+  delete e.state.missions["c4_sim"];
+  e.startMission("c4_lab");
+  assert(e.state.activeMissionId === "c4_lab", "c4_lab starts from a save that lacked chapter 4 runtimes");
+  assert(e.state.world.hosts["PC-WIN"]?.os.includes("Windows"), "PC-WIN hydrated onto old save");
 }
 
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);

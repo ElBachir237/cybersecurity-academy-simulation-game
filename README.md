@@ -58,7 +58,7 @@ Ce sont des commandes **d’exploitation légitime** (admin, diag, durcissement)
 
 ## Campagne actuelle
 
-Le curriculum **jouable** aujourd’hui : chapitres **1, 2 et 3**. La vision carrière (helpdesk → architecte / GRC) est décrite plus bas ; l’Académie in-game affiche encore l’ancienne liste 1–10 tant que les palier suivants ne sont pas codés.
+Le curriculum **jouable** aujourd’hui : chapitres **1, 2, 3 et 4**. La vision carrière (systèmes → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 5–10 en « à venir ».
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -99,6 +99,21 @@ Boucle complète autour d’un **pare-feu FORWARD simulé** : défaut inter-VLAN
 Commandes lab : `sudo iptables -L`, `sudo iptables -D <id>`, `sudo iptables -A FORWARD -s CIDR -d CIDR -j ACCEPT|DROP`, et sur `SW-01` : `show vlan`, `show interfaces status`, `sudo switchport Gi0/14 vlan 40`.
 
 Réussir le chapitre débloque le certificat **Network Sentinel**.
+
+### Chapitre 4 — Helpdesk & poste de travail (`released`)
+
+Boucle complète **Windows + UniFi** : le terminal n’est plus seulement Linux. `PC-WIN`, `PC-AMINA`, `AP-01`, `PRN-01` sont dans le monde. Les vieilles saves reçoivent ces hôtes sans reset.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Banc Windows** (`c4_lab`) | Lab | `PC-WIN` : `ipconfig`, ping, DNS `8.8.8.8` → `netsh … dnsservers` `10.0.0.10` |
+| **Amina n’a plus le Wi-Fi métier** (`c4_wifi`) | Mission | `AP-01` sur `HORIZON-GUEST` / VLAN 30 ; `set-ssid` / `set-vlan` puis `netsh wlan connect name=HORIZON-CORP` |
+| **Compte verrouillé, rien n’imprime** (`c4_desk`) | Mission | `net user amina /active:yes`, `net start spooler`, ping `192.168.10.88` ; mot de passe dans le chat = erreur |
+| **Simulation : ticket helpdesk** (`c4_sim`) | Simulation | Variantes `link` / `ip` / `wifi` sur `PC-WIN` |
+
+Commandes lab : `ipconfig`, `ipconfig /all`, `ping`, `nslookup`, `netsh interface ipv4 set dnsservers|address`, `netsh interface set interface … admin=ENABLED`, `netsh wlan show interfaces|connect`, `net user`, `net start spooler`. Sur `AP-01` : `info`, `show wireless`, `set-ssid`, `set-vlan`.
+
+Réussir le chapitre débloque le certificat **Service Desk Associate**.
 
 ---
 
@@ -152,29 +167,13 @@ Même politique, **syntaxes différentes** : un trou `0.0.0.0/0` se voit aussi b
 
 Chaque chapitre : **lab + tickets terrain + décision + examen à variantes**, certificat, skills branchées sur le moteur. Les titres ci-dessous sont le **but métier** ; l’Académie actuelle affiche encore 10 lignes « soon » — elles seront renommées / étendues au fur et à mesure.
 
-### Chapitres 1–3 — `released` (années 0–2)
+### Chapitres 1–4 — `released` (années 0–2)
 
-Helpdesk Linux, adressage, segmentation. Voir ci-dessus.
+Helpdesk Linux, adressage, segmentation, **puis helpdesk Windows / Wi-Fi**. Voir ci-dessus.
 
-**Compétences déjà en jeu :** terminal, DNS, DHCP, IPv4/CIDR, VLAN, switching d’accès, firewall FORWARD, NAT trop ouvert, diagnostic.
+**Compétences déjà en jeu :** terminal, DNS, DHCP, IPv4/CIDR, VLAN, switching d’accès, firewall FORWARD, NAT trop ouvert, **ipconfig / netsh**, UniFi SSID/VLAN, compte Windows, spooler.
 
-### Chapitre 4 — Helpdesk & poste de travail (`next`)
-
-**But :** vivre le premier métier : dépanner un humain, un PC Windows, le Wi-Fi, une imprimante — avec **leurs** commandes.
-
-**Objectif :** le joueur n’est plus seulement « celui qui ping Linux ». Il installe un compte, lit `ipconfig` / `netsh`, remet un AP sur le bon SSID/VLAN, clôture un ticket dans le temps.
-
-| Mission type | Contenu |
-| --- | --- |
-| Lab | Poste Windows `PC-WIN` : `ipconfig`, ping, DNS |
-| Ticket matériel | AP / Wi-Fi : client isolé, mauvais VLAN |
-| Ticket logiciel | Compte lockout, imprimante, logiciel qui « ne lance pas » |
-| Décision | Rassurer trop vite vs diagnostiquer |
-| Exam | 3 pannes (lien / IP / Wi-Fi) |
-
-**Skills :** `windows_admin`, `wifi`, `computer_basics`, `network_diag`. Certificat visé : **Service Desk Associate**.
-
-### Chapitre 5 — Systèmes & hébergement
+### Chapitre 5 — Systèmes & hébergement (`next`)
 
 **But :** administrer des **serveurs**, pas seulement dépanner un PC. Services, logs, sauvegarde, premier **annuaire**, et **mettre un site en ligne** dans le monde.
 
@@ -264,8 +263,8 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 
 | Étape | Livrable | Débloque |
 | --- | --- | --- |
-| **E0** | Ce document de vision (ce commit) | Alignement produit |
-| **E1** | Ch. 4 Helpdesk : Windows + `ipconfig`/`netsh` + Wi-Fi/AP | Métier junior, plus seulement Linux |
+| **E0** | Document de vision | Alignement produit |
+| **E1** | Ch. 4 Helpdesk : Windows + `ipconfig`/`netsh` + Wi-Fi/AP | **Fait** |
 | **E2** | Horloge de mission + dossier de carrière (décisions persistantes) | Pression « monde réel » |
 | **E3** | Ch. 5 Systèmes + AD simulé + **hébergement** (vhost nginx, site visible dans Browser) | Admin + sites |
 | **E4** | Ch. 6 : **pfSense + MikroTik RouterOS + passerelle UniFi** (plus le FW générique seul) | Quotidien réseau réel |
@@ -277,7 +276,7 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
 | **E11** | Ch. 14–15 GRC + capstone | Management / expert |
 
-**Prochaine implémentation :** étape **E1** (chapitre 4 helpdesk Windows / Wi-Fi), pas le SOC, pas l’atelier 5★. L’atelier sans les compétences 4–6 serait un dessin, pas une carrière.
+**Prochaine implémentation :** étape **E2** (horloge de mission + dossier de carrière), puis **E3** (systèmes + AD + hébergement). Pas le SOC, pas l’atelier 5★.
 
 ---
 
@@ -346,7 +345,7 @@ Sans `DATABASE_URL`, les routes `/api/save` et `/api/certificates` échouent, ma
 | `npm run start` | Serveur de production |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run smoke` | Walkthrough moteur chapitres 1–3 |
+| `npm run smoke` | Walkthrough moteur chapitres 1–4 |
 
 Playwright (serveur déjà lancé) :
 
@@ -391,7 +390,7 @@ Aujourd’hui une mission = TypeScript + closures. Un formateur ne peut pas écr
 
 ### 3. Monde simulé plus riche
 
-- Hôtes **Windows** et CLI `ipconfig` / `netsh` (chapitre 4).
+- Hôtes **Windows** et CLI `ipconfig` / `netsh` (chapitre 4 — **en jeu**).
 - **MikroTik RouterOS**, **pfSense**, **passerelle UniFi** (ch. 6) — syntaxe / UI de chaque marque.
 - Serveurs + **hébergement web** : vhosts, DNS, TLS, sites qui s’ouvrent dans Browser.
 - Active Directory **simulé**, IAM, certificats PKI — les skills existent, le monde non encore.
@@ -443,13 +442,13 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | Couche | Maturité |
 | --- | --- |
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
-| Moteur + terminal réseau | Solide pour les chapitres 1–3 (Linux, VLAN, FW, switch) |
-| Contenu jouable | Chapitres 1–3 (lab + tickets + exams à variantes, ch. 3 = 5 missions) |
-| Curriculum carrière (ch. 4–15, pfSense/MikroTik/UniFi, hébergement, atelier) | Vision écrite, pas encore jouable |
+| Moteur + terminal | Solide pour les ch. 1–4 (Linux, Windows, VLAN, FW, switch, UniFi AP) |
+| Contenu jouable | Chapitres 1–4 (labs + tickets + exams à variantes) |
+| Curriculum carrière (ch. 5–15, pfSense/MikroTik, hébergement, atelier) | Vision écrite, pas encore jouable |
 | SOC, certificats serveur, classe | Amorcé |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est convaincant comme **début de carrière IT / réseau** (helpdesk Linux → adressage → segmentation). Ce n’est pas encore l’académie complète (Windows, pfSense, MikroTik, UniFi, hébergement, AD, SOC, architecture 5★). La suite utile n’est pas « plus d’UI », c’est **le palier suivant du métier** (étape E1).
+Le prototype est un **début de carrière IT** (helpdesk Linux → adressage → segmentation → **helpdesk Windows / Wi-Fi**). Ce n’est pas encore l’académie complète (pfSense, MikroTik, hébergement, AD, SOC, architecture 5★). La suite utile : **E2** (timer + dossier), puis **E3**.
 
 ---
 

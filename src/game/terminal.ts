@@ -10,12 +10,19 @@ import type { TFn } from "./i18n";
 import {
   DNS_ZONE,
   INTERNAL_SITES,
+  WIFI_CORP_SSID,
+  WIFI_GUEST_SSID,
+  associateWifi,
+  findApBySsid,
   firewallAllows,
   formatFwList,
   formatSwitchPorts,
   formatVlanTable,
   ipInCidr,
+  isApOs,
+  isWindowsOs,
   l2Allowed,
+  primaryIface,
   seedFwRules,
   seedSwitchPorts,
 } from "./data/world";
@@ -84,8 +91,38 @@ export function resolveName(
 
 type PathResult = "ok" | "no-iface" | "no-route" | "filtered";
 
+function tokenize(line: string): string[] {
+  const tokens: string[] = [];
+  const re = /"([^"]*)"|(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(line.trim()))) {
+    tokens.push(m[1] !== undefined ? m[1] : m[2]!);
+  }
+  return tokens;
+}
+
+function maskToCidr(mask: string): number | null {
+  const parts = mask.split(".").map((o) => Number(o));
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return null;
+  }
+  const bits = parts.map((n) => n.toString(2).padStart(8, "0")).join("");
+  if (!/^1*0*$/.test(bits)) return null;
+  return bits.split("1").length - 1;
+}
+
+function cidrToMask(cidr: number): string {
+  const mask = cidr === 0 ? 0 : (~0 << (32 - cidr)) >>> 0;
+  return [24, 16, 8, 0].map((s) => String((mask >>> s) & 255)).join(".");
+}
+
 function pathTo(target: string, host: HostRuntime, state: GameState): PathResult {
-  const iface = host.ifaces.eth0 ?? Object.values(host.ifaces)[0];
+  if (host.wifiClient && !host.wifiClient.connected && !host.ifaces.Ethernet && !host.ifaces.eth0) {
+    const wifi = host.ifaces["Wi-Fi"];
+    if (!wifi || wifi.state !== "up" || !wifi.ip) return "no-iface";
+  }
+  const picked = primaryIface(host);
+  const iface = picked?.iface;
   if (!iface || iface.state !== "up" || !iface.ip) return "no-iface";
   if (target === iface.ip) return "ok";
   if (target.startsWith("127.")) return "ok";
@@ -214,24 +251,24 @@ function stripSudo(argv: string[]): string[] {
 
 // ---------------- Command: ping ----------------
 function cmdPing(argv: string[], host: HostRuntime, state: GameState, t: TFn): string[] {
-  const target = argv[0];
-  if (!target) return ["ping: usage: ping [-c count] destination"];
-  if (target.startsWith("-")) return ["ping: options non supportées dans le lab"];
+  const target = argv.find((a) => !a.startsWith("-"));
+  if (!target) return isWindowsOs(host.os) ? ["Usage: ping [-n count] destination"] : ["ping: usage: ping [-c count] destination"];
   const isName = /[a-zA-Z]/.test(target);
   let ip = target;
   if (isName) {
     const resolved = resolveName(target, host, state);
     if (!resolved) {
-      return [
-        `ping: ${target}: ${t("terminal.pingDnsFail", { host: target })}`,
-      ];
+      return isWindowsOs(host.os)
+        ? [`Ping request could not find host ${target}. Please check the name and try again.`]
+        : [`ping: ${target}: ${t("terminal.pingDnsFail", { host: target })}`];
     }
     ip = resolved;
   }
+  const path = pathTo(ip, host, state);
+  if (isWindowsOs(host.os)) return formatWindowsPing(target, ip, isName, path, host, t);
   const out: string[] = [];
   const label = isName ? `${target} (${ip})` : ip;
   out.push(`PING ${label} 56(84) bytes of data.`);
-  const path = pathTo(ip, host, state);
   if (path === "ok") {
     for (let i = 1; i <= 4; i++) {
       const ms = (0.4 + Math.random() * 2.5).toFixed(2);
@@ -240,7 +277,7 @@ function cmdPing(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
     out.push(t("terminal.pingStats", { target }));
     out.push(t("terminal.packets", { sent: 4, recv: 4, loss: 0 }));
   } else {
-    const iface = host.ifaces.eth0 ?? Object.values(host.ifaces)[0];
+    const iface = primaryIface(host)?.iface;
     if (path === "no-iface" || !iface || iface.state !== "up" || !iface.ip) {
       out.push("connect: Network is unreachable");
     } else if (path === "filtered") {
@@ -253,6 +290,44 @@ function cmdPing(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
       out.push(t("terminal.pingStats", { target }));
       out.push(t("terminal.packets", { sent: 4, recv: 0, loss: 100 }));
     }
+  }
+  return out;
+}
+
+function formatWindowsPing(
+  target: string,
+  ip: string,
+  isName: boolean,
+  path: PathResult,
+  host: HostRuntime,
+  t: TFn
+): string[] {
+  const label = isName ? `${target} [${ip}]` : ip;
+  const out = [`Pinging ${label} with 32 bytes of data:`];
+  if (path === "ok") {
+    for (let i = 0; i < 4; i++) {
+      const ms = Math.max(1, Math.round(0.4 + Math.random() * 3));
+      out.push(`Reply from ${ip}: bytes=32 time=${ms}ms TTL=128`);
+    }
+    out.push("");
+    out.push(`Ping statistics for ${ip}:`);
+    out.push(`    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),`);
+    out.push(t("terminal.packets", { sent: 4, recv: 4, loss: 0 }));
+  } else {
+    const iface = primaryIface(host)?.iface;
+    if (path === "no-iface" || !iface || iface.state !== "up" || !iface.ip) {
+      out.push("General failure.");
+    } else if (path === "filtered") {
+      for (let i = 0; i < 4; i++) out.push("Request timed out.");
+    } else {
+      for (let i = 0; i < 4; i++) {
+        out.push(`Reply from ${iface.gw ?? iface.ip}: Destination host unreachable.`);
+      }
+    }
+    out.push("");
+    out.push(`Ping statistics for ${ip}:`);
+    out.push(`    Packets: Sent = 4, Received = 0, Lost = 4 (100% loss),`);
+    out.push(t("terminal.packets", { sent: 4, recv: 0, loss: 100 }));
   }
   return out;
 }
@@ -414,11 +489,12 @@ function cmdIp(args: string[], host: HostRuntime): string[] {
       }
     }
   } else if (sub === "route" || sub === "r") {
-    const iface = host.ifaces.eth0 ?? Object.values(host.ifaces)[0];
+    const iface = primaryIface(host)?.iface;
+    const dev = primaryIface(host)?.name ?? Object.keys(host.ifaces)[0];
     if (iface && iface.state === "up" && iface.ip) {
-      if (iface.gw) out.push(`default via ${iface.gw} dev ${Object.keys(host.ifaces)[0]} proto static`);
+      if (iface.gw) out.push(`default via ${iface.gw} dev ${dev} proto static`);
       out.push(
-        `${networkOf(iface.ip, iface.cidr ?? 24)}/${iface.cidr} dev ${Object.keys(host.ifaces)[0]} proto kernel scope link src ${iface.ip}`
+        `${networkOf(iface.ip, iface.cidr ?? 24)}/${iface.cidr} dev ${dev} proto kernel scope link src ${iface.ip}`
       );
     }
   } else if (sub === "link") {
@@ -547,6 +623,390 @@ function cmdCurl(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
   return [t("terminal.curlFail", { url })];
 }
 
+function ifaceByName(host: HostRuntime, name: string): string | undefined {
+  const keys = Object.keys(host.ifaces);
+  const exact = keys.find((k) => k.toLowerCase() === name.toLowerCase());
+  return exact;
+}
+
+function cmdIpconfig(host: HostRuntime, all: boolean): string[] {
+  const out = ["", `Windows IP Configuration`, ""];
+  if (all) {
+    out.push(`   Host Name . . . . . . . . . . . . : ${host.id.toLowerCase()}`);
+    out.push(`   Primary Dns Suffix  . . . . . . . : horizon.local`);
+    out.push(`   Node Type . . . . . . . . . . . . : Hybrid`);
+    out.push("");
+  }
+  for (const [name, i] of Object.entries(host.ifaces)) {
+    const media = name.toLowerCase().includes("wi") ? "Wireless LAN adapter" : "Ethernet adapter";
+    out.push(`${media} ${name}:`);
+    out.push("");
+    if (i.state !== "up") {
+      out.push("   Media State . . . . . . . . . . . : Media disconnected");
+      out.push("");
+      continue;
+    }
+    out.push(`   Connection-specific DNS Suffix  . : horizon.local`);
+    if (all) out.push(`   Physical Address. . . . . . . . . : ${macFor(host.id, name).toUpperCase().replace(/:/g, "-")}`);
+    out.push(`   DHCP Enabled. . . . . . . . . . . : ${i.dhcp ? "Yes" : "No"}`);
+    if (i.ip) {
+      out.push(`   IPv4 Address. . . . . . . . . . . : ${i.ip}`);
+      out.push(`   Subnet Mask . . . . . . . . . . . : ${cidrToMask(i.cidr ?? 24)}`);
+      if (i.gw) out.push(`   Default Gateway . . . . . . . . . : ${i.gw}`);
+      if (all && host.dns[0]) {
+        out.push(`   DNS Servers . . . . . . . . . . . : ${host.dns[0]}`);
+        for (const extra of host.dns.slice(1)) out.push(`                                       ${extra}`);
+      }
+    } else {
+      out.push("   Autoconfiguration IPv4 Address. . : 169.254.12.40");
+      out.push("   Subnet Mask . . . . . . . . . . . : 255.255.0.0");
+    }
+    out.push("");
+  }
+  return out;
+}
+
+function cmdNetsh(args: string[], host: HostRuntime, state: GameState): string[] {
+  const joined = args.map((a) => a.toLowerCase());
+  if (args[0] === "wlan") {
+    if (args[1] === "show" && (args[2] === "interfaces" || args[2] === "interface")) {
+      const wifi = host.ifaces["Wi-Fi"];
+      const client = host.wifiClient;
+      if (!wifi) return ["There is no wireless interface on this host."];
+      return [
+        "There is 1 interface on the system: ",
+        "",
+        "    Name                   : Wi-Fi",
+        `    State                  : ${client?.connected && wifi.state === "up" ? "connected" : "disconnected"}`,
+        `    SSID                   : ${client?.connected ? client.ssid ?? "" : ""}`,
+        `    Radio type             : 802.11ac`,
+        `    IPv4 Address           : ${wifi.ip ?? ""}`,
+      ];
+    }
+    if (args[1] === "show" && args[2] === "profiles") {
+      return [
+        "Profiles on interface Wi-Fi:",
+        "",
+        `    All User Profile     : ${WIFI_CORP_SSID}`,
+        `    All User Profile     : ${WIFI_GUEST_SSID}`,
+      ];
+    }
+    if (args[1] === "connect") {
+      let ssid = netshName(args) ?? "";
+      if (!ssid) {
+        ssid = args.slice(2).find((a) => !/^(name|name=)$/i.test(a)) ?? "";
+      }
+      ssid = ssid.replace(/^["']|["']$/g, "");
+      if (!ssid) return ['Usage: netsh wlan connect name=<SSID>'];
+      const ap = findApBySsid(state, ssid);
+      if (!ap) {
+        return [`The network with SSID "${ssid}" is not available.`];
+      }
+      if (!host.ifaces["Wi-Fi"]) host.ifaces["Wi-Fi"] = { state: "down", dhcp: true };
+      associateWifi(host, ap);
+      return [`Connection request was completed successfully.`];
+    }
+    return ["The following command was not found: " + args.join(" ")];
+  }
+
+  if (args[0] === "interface") {
+    if (args[1] === "set" && args[2] === "interface") {
+      const name = netshName(args) ?? "Ethernet";
+      const key = ifaceByName(host, name);
+      if (!key || !host.ifaces[key]) return [`The requested operation requires elevation (Run as administrator).`];
+      const admin = args.find((a) => a.toLowerCase().startsWith("admin="))?.split("=")[1]
+        ?? args[args.findIndex((a) => a.toLowerCase() === "admin") + 1];
+      const on = /^(enabled?|on)$/i.test(admin ?? "");
+      const off = /^(disabled?|off)$/i.test(admin ?? "");
+      if (!on && !off) return ['Usage: netsh interface set interface name="Ethernet" admin=ENABLED'];
+      host.ifaces[key].state = on ? "up" : "down";
+      host.logs.push(`Sep 12 netsh: ${key} admin=${on ? "ENABLED" : "DISABLED"}`);
+      return [`The requested operation completed successfully.`];
+    }
+    if (args[1] === "ipv4" && args[2] === "show") {
+      return cmdIpconfig(host, true);
+    }
+    if (args[1] === "ipv4" && args[2] === "set" && args[3] === "address") {
+      const name = netshName(args) ?? "Ethernet";
+      const key = ifaceByName(host, name);
+      if (!key || !host.ifaces[key]) return [`An interface with this name is not registered.`];
+      const staticIdx = args.findIndex((a) => a.toLowerCase() === "static");
+      if (staticIdx < 0) return ['Usage: netsh interface ipv4 set address name="Ethernet" static <ip> <mask> <gw>'];
+      const ip = args[staticIdx + 1];
+      const mask = args[staticIdx + 2];
+      const gw = args[staticIdx + 3];
+      const cidr = mask ? maskToCidr(mask) : null;
+      if (!ip || !cidr || !gw) return ["The parameter is incorrect."];
+      host.ifaces[key] = { state: "up", dhcp: false, ip, cidr, gw };
+      host.logs.push(`Sep 12 netsh: ${key} ${ip}/${cidr} gw ${gw}`);
+      return ["The requested operation completed successfully."];
+    }
+    if (args[1] === "ipv4" && args[2] === "set" && (args[3] === "dnsservers" || args[3] === "dns")) {
+      const dns = args.find((a) => /^\d+\.\d+\.\d+\.\d+$/.test(a));
+      if (!dns) return ['Usage: netsh interface ipv4 set dnsservers name="Ethernet" static 10.0.0.10'];
+      host.dns = [dns];
+      host.logs.push(`Sep 12 netsh: dns ${dns}`);
+      return ["The requested operation completed successfully."];
+    }
+  }
+  void joined;
+  return ["The following command was not found: netsh " + args.join(" ")];
+}
+
+function netshName(args: string[]): string | undefined {
+  const strip = (s: string) => s.replace(/^["']|["']$/g, "");
+  const eq = args.find((a) => a.toLowerCase().startsWith("name="));
+  if (eq) return strip(eq.slice(eq.indexOf("=") + 1));
+  const idx = args.findIndex((a) => a.toLowerCase() === "name");
+  if (idx >= 0) return strip(args[idx + 1] ?? "");
+  return undefined;
+}
+
+function cmdNetUser(args: string[], host: HostRuntime): string[] {
+  const accounts = host.accounts ?? {};
+  if (!args.length) {
+    const names = Object.keys(accounts);
+    return ["User accounts for \\\\" + host.id, "", ...names.map((n) => n), "The command completed successfully."];
+  }
+  const user = args[0].toLowerCase();
+  const acc = accounts[user];
+  const flag = args.find((a) => a.startsWith("/"));
+  if (flag && /^\/active:(yes|no)$/i.test(flag)) {
+    if (!acc) return [`The user name could not be found.`];
+    const yes = /yes/i.test(flag);
+    acc.active = yes;
+    if (yes) acc.locked = false;
+    host.logs.push(`Sep 12 net: user ${user} active=${yes}`);
+    return ["The command completed successfully."];
+  }
+  if (!acc) return [`The user name could not be found.`];
+  return [
+    `User name                    ${acc.name}`,
+    `Full Name                    ${acc.name}`,
+    `Comment                      HORIZON workstation`,
+    `Account active               ${acc.active && !acc.locked ? "Yes" : "No"}`,
+    `Account expires              Never`,
+    `Password last set            9/1/2026 8:00:00 AM`,
+    `Lockout                      ${acc.locked ? "Yes" : "No"}`,
+    `The command completed successfully.`,
+  ];
+}
+
+function execWindowsShell(argv: string[], host: HostRuntime, state: GameState, t: TFn): TermResult {
+  const cmd = (argv[0] ?? "").toLowerCase();
+  const args = argv.slice(1);
+  const signals: TermSignals = { cmd: argv[0] ?? "", argv };
+  const out: string[] = [];
+  switch (cmd) {
+    case "help":
+      out.push("Commandes Windows (simulées, syntaxe réelle) :");
+      out.push("  ipconfig              configuration IPv4");
+      out.push("  ipconfig /all         DNS, DHCP, passerelle");
+      out.push("  ping <hôte>           tester la connectivité");
+      out.push("  nslookup <nom>        résolution DNS");
+      out.push("  netsh interface ...   IP, DNS, admin up/down");
+      out.push("  netsh wlan show interfaces | connect name=<SSID>");
+      out.push("  net user [nom] [/active:yes]");
+      out.push("  net start spooler     service d'impression");
+      out.push("  hostname  whoami  cls");
+      break;
+    case "cls":
+      signals.clear = true;
+      break;
+    case "hostname":
+      out.push(host.id);
+      break;
+    case "whoami":
+      out.push(`horizon\\${Object.keys(host.accounts ?? { student: 1 })[0] ?? "student"}`);
+      break;
+    case "ipconfig":
+      out.push(...cmdIpconfig(host, args.includes("/all") || args.includes("-all")));
+      break;
+    case "ping":
+      out.push(...cmdPing(args, host, state, t));
+      break;
+    case "nslookup":
+    case "nslookup.exe":
+      out.push(...cmdNslookup(args, host, state));
+      break;
+    case "netsh":
+      out.push(...cmdNetsh(args, host, state));
+      break;
+    case "net":
+      if (args[0]?.toLowerCase() === "user") out.push(...cmdNetUser(args.slice(1), host));
+      else if (args[0]?.toLowerCase() === "start") {
+        const svc = (args[1] ?? "").toLowerCase();
+        if (!svc) out.push("The syntax of this command is:");
+        else {
+          host.services[svc] = "active";
+          out.push(`The ${svc} service was started successfully.`);
+        }
+      } else if (args[0]?.toLowerCase() === "stop") {
+        const svc = (args[1] ?? "").toLowerCase();
+        host.services[svc] = "inactive";
+        out.push(`The ${svc} service was stopped successfully.`);
+      } else out.push("The syntax of this command is:");
+      break;
+    case "sc":
+      if (args[0]?.toLowerCase() === "query") {
+        const svc = (args[1] ?? "spooler").toLowerCase();
+        const st = host.services[svc] ?? "inactive";
+        out.push(`SERVICE_NAME: ${svc}`, `        STATE              : ${st === "active" ? "4  RUNNING" : "1  STOPPED"}`);
+      } else out.push("ERROR:  Unrecognized command");
+      break;
+    case "clear":
+      signals.clear = true;
+      break;
+    default:
+      out.push(`'${argv[0]}' is not recognized as an internal or external command,`);
+      out.push("operable program or batch file.");
+  }
+  return { output: out, signals };
+}
+
+function cmdNslookup(args: string[], host: HostRuntime, state: GameState): string[] {
+  const name = args.find((a) => !a.startsWith("-"));
+  if (!name) return ["Default Server:  UnKnown", `Address:  ${host.dns[0] ?? ""}`, ""];
+  const ip = resolveName(name, host, state);
+  const dnsOk = !!host.dns[0] && ipReachable(host.dns[0], host, state);
+  if (!dnsOk) return ["*** UnKnown can't find " + name + ": No response from server"];
+  if (!ip) return [`*** UnKnown can't find ${name}: Non-existent domain`];
+  return [
+    `Server:  dns-01.horizon.local`,
+    `Address:  ${host.dns[0]}`,
+    "",
+    `Name:    ${name}`,
+    `Address:  ${ip}`,
+  ];
+}
+
+function execApShell(argv: string[], host: HostRuntime, state: GameState, t: TFn): TermResult {
+  const cmd = (argv[0] ?? "").toLowerCase();
+  const args = argv.slice(1);
+  const signals: TermSignals = { cmd: argv[0] ?? "", argv };
+  const ap = host.wifiAp ?? { ssid: WIFI_CORP_SSID, vlan: 10, enabled: true };
+  host.wifiAp = ap;
+  const out: string[] = [];
+  const applySsid = (ssid: string) => {
+    const prev = ap.ssid;
+    ap.ssid = ssid;
+    host.logs.push(`Sep 12 unifi: ssid ${ssid}`);
+    for (const h of Object.values(state.world.hosts)) {
+      if (h.wifiClient?.ssid === prev) {
+        h.wifiClient.connected = false;
+        const wifi = h.ifaces["Wi-Fi"];
+        if (wifi) {
+          wifi.state = "down";
+          delete wifi.ip;
+          delete wifi.gw;
+        }
+      }
+    }
+  };
+  const applyVlan = (vlan: number) => {
+    ap.vlan = vlan;
+    host.logs.push(`Sep 12 unifi: vlan ${vlan}`);
+    reassociateClients(state, host);
+  };
+  switch (cmd) {
+    case "help":
+      out.push("UniFi AP CLI (simulé)");
+      out.push("  info                 modèle, IP, SSID, VLAN");
+      out.push("  show wireless        WLAN / VLAN");
+      out.push("  set-ssid <SSID>      SSID diffusé (HORIZON-CORP | HORIZON-GUEST)");
+      out.push("  set-vlan <10|30>     VLAN d'accès Wi-Fi");
+      out.push("  ping <hôte>");
+      break;
+    case "info":
+      out.push(`Model:       UAP-AC-Pro`);
+      out.push(`Version:     6.6.77`);
+      out.push(`MAC Address: ${macFor(host.id, "eth0")}`);
+      out.push(`IP Address:  ${host.ifaces.eth0?.ip ?? ""}`);
+      out.push(`Hostname:    ${host.id}`);
+      out.push(`SSID:        ${ap.ssid}`);
+      out.push(`VLAN:        ${ap.vlan}`);
+      out.push(`Status:      Connected`);
+      break;
+    case "show":
+      if (args[0] === "wireless" || args[0] === "wlan") {
+        out.push("SSID            VLAN  Status");
+        out.push("--------------------------------");
+        out.push(`${ap.ssid.padEnd(16)}${String(ap.vlan).padEnd(6)}${ap.enabled ? "enabled" : "disabled"}`);
+      } else out.push("show wireless");
+      break;
+    case "set-ssid":
+    case "setssid": {
+      const ssid = args.join(" ");
+      if (!ssid) out.push("usage: set-ssid <SSID>");
+      else {
+        applySsid(ssid);
+        out.push(`SSID updated: ${ssid}`);
+      }
+      break;
+    }
+    case "set-vlan":
+    case "setvlan": {
+      const vlan = Number(args[0]);
+      if (!Number.isInteger(vlan) || (vlan !== 10 && vlan !== 30 && vlan !== 20 && vlan !== 40)) {
+        out.push("usage: set-vlan <10|20|30|40>");
+      } else {
+        applyVlan(vlan);
+        out.push(`WLAN VLAN updated: ${vlan}`);
+      }
+      break;
+    }
+    case "set":
+      if (args[0] === "ssid" && args[1]) {
+        applySsid(args.slice(1).join(" "));
+        out.push(`SSID updated: ${ap.ssid}`);
+      } else if (args[0] === "vlan" && args[1]) {
+        const vlan = Number(args[1]);
+        if (!Number.isInteger(vlan)) out.push("usage: set vlan <n>");
+        else {
+          applyVlan(vlan);
+          out.push(`WLAN VLAN updated: ${vlan}`);
+        }
+      } else out.push("set ssid <SSID> | set vlan <n>");
+      break;
+    case "ping":
+      out.push(...cmdPing(args, host, state, t));
+      break;
+    case "clear":
+      signals.clear = true;
+      break;
+    default:
+      out.push(`Unknown command: ${argv[0]}  (try 'help')`);
+  }
+  return { output: out, signals };
+}
+
+function reassociateClients(state: GameState, ap: HostRuntime): void {
+  if (!ap.wifiAp) return;
+  for (const h of Object.values(state.world.hosts)) {
+    if (!h.wifiClient?.connected) continue;
+    if (h.wifiClient.ssid && h.wifiClient.ssid.toLowerCase() === ap.wifiAp.ssid.toLowerCase()) {
+      associateWifi(h, ap);
+    }
+  }
+}
+
+function execPrinterShell(argv: string[], host: HostRuntime): TermResult {
+  const cmd = (argv[0] ?? "").toLowerCase();
+  const signals: TermSignals = { cmd: argv[0] ?? "", argv };
+  if (cmd === "help" || cmd === "info" || cmd === "?") {
+    return {
+      output: [
+        "HP JetDirect",
+        `Hostname: ${host.id}`,
+        `IP: ${host.ifaces.eth0?.ip ?? ""}`,
+        "Ready.",
+      ],
+      signals,
+    };
+  }
+  return { output: [`${argv[0]}: not available on this device`], signals };
+}
+
 // ---------------- Main executor ----------------
 export function execTerminal(
   line: string,
@@ -560,14 +1020,19 @@ export function execTerminal(
   }
   const trimmed = line.trim();
   const sudo = isSudo(trimmed);
-  const rawArgv = trimmed.split(/\s+/).filter(Boolean);
+  const rawArgv = tokenize(trimmed);
   const argv = stripSudo(rawArgv);
   const cmd = argv[0];
   const args = argv.slice(1);
   const signals: TermSignals = { cmd, argv };
-  const out: string[] = [];
 
   if (!trimmed) return { output: [], signals };
+
+  if (isWindowsOs(host.os)) return execWindowsShell(argv, host, state, t);
+  if (isApOs(host.os)) return execApShell(argv, host, state, t);
+  if (/jetdirect|laserjet|printer/i.test(host.os)) return execPrinterShell(argv, host);
+
+  const out: string[] = [];
 
   // `ip link set <iface> up|down` handled here (needs sudo + signals)
   if (cmd === "ip" && args[0] === "link" && args[1] === "set") {

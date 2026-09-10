@@ -5,7 +5,7 @@
 // tickets and NPC moods; the engine snapshots it into saves.
 // ============================================================
 
-import type { FwRule, GameState, HostRuntime, SwitchPort } from "../types";
+import type { FwRule, GameState, HostRuntime, IfaceRuntime, SwitchPort } from "../types";
 
 export const CORE_CIDR = "10.0.0.0/24";
 export const FINANCE_CIDR = "192.168.20.0/24";
@@ -83,14 +83,101 @@ export function seedSwitchPorts(): SwitchPort[] {
     { id: "Gi0/14", vlan: 40, hostId: "PC-NOUR", state: "up" },
     { id: "Gi0/16", vlan: 30, hostId: "PC-PAUL", state: "up" },
     { id: "Gi0/20", vlan: 10, hostId: "AP-01", state: "up" },
+    { id: "Gi0/22", vlan: 10, hostId: "PC-WIN", state: "up" },
+    { id: "Gi0/24", vlan: 10, hostId: "PRN-01", state: "up" },
   ];
+}
+
+export const WIFI_CORP_SSID = "HORIZON-CORP";
+export const WIFI_GUEST_SSID = "HORIZON-GUEST";
+
+export function isWindowsOs(os: string): boolean {
+  return /windows/i.test(os);
+}
+
+export function isApOs(os: string): boolean {
+  return /unifi|ubiquiti/i.test(os);
+}
+
+export function primaryIface(host: HostRuntime): { name: string; iface: IfaceRuntime } | null {
+  const skipWifi = host.wifiClient && !host.wifiClient.connected;
+  const order = ["Ethernet", "eth0", "Wi-Fi", "wlan0"];
+  for (const name of order) {
+    if (skipWifi && (name === "Wi-Fi" || name === "wlan0")) continue;
+    const iface = host.ifaces[name];
+    if (iface && iface.state === "up" && iface.ip) return { name, iface };
+  }
+  for (const [name, iface] of Object.entries(host.ifaces)) {
+    if (skipWifi && (name === "Wi-Fi" || name === "wlan0")) continue;
+    if (iface.state === "up" && iface.ip) return { name, iface };
+  }
+  const first = Object.entries(host.ifaces)[0];
+  return first ? { name: first[0], iface: first[1] } : null;
+}
+
+export function findApBySsid(state: GameState, ssid: string): HostRuntime | undefined {
+  return Object.values(state.world.hosts).find(
+    (h) => h.wifiAp?.enabled && h.wifiAp.ssid.toLowerCase() === ssid.toLowerCase()
+  );
+}
+
+export function wifiLeaseForVlan(vlan: number): {
+  ip: string;
+  cidr: number;
+  gw: string;
+  dns: string;
+} {
+  if (vlan === 30) {
+    return { ip: "192.168.30.51", cidr: 24, gw: "192.168.30.1", dns: "1.1.1.1" };
+  }
+  return { ip: "192.168.10.61", cidr: 24, gw: "192.168.10.1", dns: "10.0.0.10" };
+}
+
+export function associateWifi(client: HostRuntime, ap: HostRuntime): boolean {
+  if (!ap.wifiAp?.enabled) {
+    if (client.wifiClient) client.wifiClient.connected = false;
+    const wifi = client.ifaces["Wi-Fi"];
+    if (wifi) {
+      wifi.state = "down";
+      delete wifi.ip;
+      delete wifi.gw;
+    }
+    return false;
+  }
+  const lease = wifiLeaseForVlan(ap.wifiAp.vlan);
+  client.wifiClient = { ssid: ap.wifiAp.ssid, connected: true };
+  client.ifaces["Wi-Fi"] = {
+    state: "up",
+    dhcp: true,
+    ip: lease.ip,
+    cidr: lease.cidr,
+    gw: lease.gw,
+  };
+  client.dns = [lease.dns];
+  client.logs.push(
+    `Sep 12 wlan: associated ${ap.wifiAp.ssid} vlan ${ap.wifiAp.vlan} dhcp ${lease.ip}`
+  );
+  return true;
+}
+
+function l2PortFor(host: HostRuntime, state: GameState): SwitchPort | undefined {
+  const ports = state.world.switchPorts;
+  if (!ports?.length) return undefined;
+  if (host.wifiClient?.connected && host.wifiClient.ssid) {
+    const ap = findApBySsid(state, host.wifiClient.ssid);
+    if (ap) {
+      const apPort = ports.find((p) => p.hostId === ap.id);
+      if (apPort) return apPort;
+    }
+  }
+  return ports.find((p) => p.hostId === host.id);
 }
 
 export function l2Allowed(host: HostRuntime, targetIp: string, state: GameState): boolean {
   if (!state.world.enforceAccessVlan) return true;
   const ports = state.world.switchPorts;
   if (!ports?.length) return true;
-  const srcPort = ports.find((p) => p.hostId === host.id);
+  const srcPort = l2PortFor(host, state);
   if (!srcPort) return true;
   if (srcPort.state !== "up") return false;
   const need = vlanForIp(targetIp);
@@ -104,7 +191,8 @@ export function l2Allowed(host: HostRuntime, targetIp: string, state: GameState)
   if (destHostId === "RTR-HQ" || destHostId === "SW-01") {
     return srcPort.vlan === need;
   }
-  const dstPort = destHostId ? ports.find((p) => p.hostId === destHostId) : undefined;
+  const destHost = destHostId ? state.world.hosts[destHostId] : undefined;
+  const dstPort = destHost ? l2PortFor(destHost, state) : undefined;
   if (dstPort) return dstPort.state === "up" && srcPort.vlan === dstPort.vlan;
   return srcPort.vlan === need;
 }
@@ -318,9 +406,64 @@ export function seedHosts(): Record<string, HostRuntime> {
     },
     dns: ["10.0.0.10"],
     services: { "hostapd": "active" },
+    wifiAp: { ssid: WIFI_CORP_SSID, vlan: 10, enabled: true },
     logs: [
       "Sep 12 08:12:00 ap-01 hostapd: 14 stations associated",
     ],
+  });
+
+  add({
+    id: "PC-WIN",
+    label: "PC-WIN — Banc helpdesk Windows",
+    os: "Windows 11 Pro",
+    room: "Helpdesk — banc 1",
+    ifaces: {
+      Ethernet: { state: "up", dhcp: false, ip: "192.168.10.55", cidr: 24, gw: "192.168.10.1" },
+      "Wi-Fi": { state: "down", dhcp: true },
+    },
+    dns: ["10.0.0.10"],
+    services: { spooler: "active" },
+    wifiClient: { ssid: null, connected: false },
+    accounts: { student: { name: "student", locked: false, active: true } },
+    logs: [
+      "Sep 12 08:00:00 pc-win: Windows 11 Pro started",
+    ],
+  });
+
+  add({
+    id: "PC-AMINA",
+    label: "PC-AMINA — Portable d'Amina (Accueil)",
+    os: "Windows 11 Pro",
+    room: "Accueil",
+    ifaces: {
+      "Wi-Fi": {
+        state: "up",
+        dhcp: true,
+        ip: "192.168.10.61",
+        cidr: 24,
+        gw: "192.168.10.1",
+      },
+    },
+    dns: ["10.0.0.10"],
+    services: { spooler: "active" },
+    wifiClient: { ssid: WIFI_CORP_SSID, connected: true },
+    accounts: { amina: { name: "amina", locked: false, active: true } },
+    logs: [
+      "Sep 12 08:20:00 pc-amina: associated HORIZON-CORP",
+    ],
+  });
+
+  add({
+    id: "PRN-01",
+    label: "PRN-01 — Imprimante accueil",
+    os: "HP LaserJet (JetDirect)",
+    room: "Accueil",
+    ifaces: {
+      eth0: { state: "up", dhcp: false, ip: "192.168.10.88", cidr: 24, gw: "192.168.10.1" },
+    },
+    dns: ["10.0.0.10"],
+    services: {},
+    logs: ["Sep 12 08:00:00 prn-01: JetDirect ready"],
   });
 
   add({
@@ -381,7 +524,7 @@ export const INTERNAL_SITES: Record<string, { title: string; body: string }> = {
   },
   "soc.horizon": {
     title: "SOC Portal",
-    body: "Accès réservé à l'équipe sécurité (chapitre 4).",
+    body: "Accès réservé à l'équipe sécurité.",
   },
   "training.horizon": {
     title: "Académie HORIZON",
@@ -404,6 +547,7 @@ export const NPCS: NpcDef[] = [
   { id: "paul", nameKey: "npc.paul", roleKey: "npc.paulRole", dept: "Logistique" },
   { id: "soriya", nameKey: "npc.soriya", roleKey: "npc.soriyaRole", dept: "SOC" },
   { id: "nour", nameKey: "npc.nour", roleKey: "npc.nourRole", dept: "Produit" },
+  { id: "amina", nameKey: "npc.amina", roleKey: "npc.aminaRole", dept: "Accueil" },
 ];
 
 // ---------------- Topology (for the Network app) ----------------
@@ -426,6 +570,9 @@ export const TOPO_NODES: TopoNode[] = [
   { id: "PC-PAUL", label: "PC-PAUL", kind: "pc", x: 510, y: 310 },
   { id: "AP-01", label: "AP-01", kind: "ap", x: 620, y: 310 },
   { id: "PC-NOUR", label: "PC-NOUR", kind: "pc", x: 700, y: 200 },
+  { id: "PC-WIN", label: "PC-WIN", kind: "pc", x: 290, y: 400 },
+  { id: "PC-AMINA", label: "PC-AMINA", kind: "pc", x: 510, y: 400 },
+  { id: "PRN-01", label: "PRN-01", kind: "pc", x: 620, y: 400 },
 ];
 
 export const TOPO_LINKS: [string, string][] = [
@@ -438,6 +585,9 @@ export const TOPO_LINKS: [string, string][] = [
   ["SW-01", "PC-PAUL"],
   ["SW-01", "AP-01"],
   ["SW-01", "PC-NOUR"],
+  ["SW-01", "PC-WIN"],
+  ["AP-01", "PC-AMINA"],
+  ["SW-01", "PRN-01"],
 ];
 
 // ---------------- Initial content ----------------

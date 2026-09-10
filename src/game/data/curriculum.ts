@@ -137,13 +137,20 @@ export const CHAPTERS: ChapterDef[] = [
     theoryKeys: ["c3_seg", "c3_fw", "c3_blast", "c3_port", "c3_nat"],
     missionIds: ["c3_lab", "c3_port", "c3_nat", "c3_mission", "c3_sim"],
   },
-  { id: 4, titleKey: "SOC Operations", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 5, titleKey: "Incident Response", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 6, titleKey: "Web Security", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 7, titleKey: "DFIR", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 8, titleKey: "Cloud Security", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 9, titleKey: "DevSecOps", status: "soon", theoryKeys: [], missionIds: [] },
-  { id: 10, titleKey: "Threat Intelligence", status: "soon", theoryKeys: [], missionIds: [] },
+  {
+    id: 4,
+    titleKey: "chapter4",
+    subKey: "chapter4",
+    status: "released",
+    theoryKeys: ["c4_win", "c4_wifi", "c4_desk"],
+    missionIds: ["c4_lab", "c4_wifi", "c4_desk", "c4_sim"],
+  },
+  { id: 5, titleKey: "Systèmes & AD", status: "soon", theoryKeys: [], missionIds: [] },
+  { id: 6, titleKey: "Admin réseau", status: "soon", theoryKeys: [], missionIds: [] },
+  { id: 7, titleKey: "SOC L1", status: "soon", theoryKeys: [], missionIds: [] },
+  { id: 8, titleKey: "SOC L2", status: "soon", theoryKeys: [], missionIds: [] },
+  { id: 9, titleKey: "Incident Response", status: "soon", theoryKeys: [], missionIds: [] },
+  { id: 10, titleKey: "DFIR", status: "soon", theoryKeys: [], missionIds: [] },
 ];
 
 export interface BadgeDef {
@@ -214,6 +221,13 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 3",
     missionIds: ["c3_lab", "c3_port", "c3_nat", "c3_mission", "c3_sim"],
     skills: ["firewall", "vlan", "switching", "seg_arch", "defense_depth"],
+  },
+  {
+    id: "svc_desk",
+    titleKey: "Service Desk Associate",
+    level: "Chapter 4",
+    missionIds: ["c4_lab", "c4_wifi", "c4_desk", "c4_sim"],
+    skills: ["windows_admin", "wifi", "computer_basics", "network_diag"],
   },
 ];
 
