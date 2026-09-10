@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // HORIZON — End-to-end engine smoke test (Chapter 1 walkthrough)
 // Simulates a real player: lab -> mission -> simulation variants
 // Run: npx tsx scripts/smoke.ts
@@ -20,10 +20,10 @@ function allLoss(out: string): boolean {
 let failures = 0;
 function assert(cond: boolean, msg: string) {
   if (cond) {
-    console.log(`  ✓ ${msg}`);
+    console.log(`  âœ“ ${msg}`);
   } else {
     failures++;
-    console.error(`  ✗ FAIL: ${msg}`);
+    console.error(`  âœ— FAIL: ${msg}`);
   }
 }
 
@@ -56,7 +56,7 @@ console.log("\n[1] LAB c1_lab");
   run(e, "WS-001", "ping 192.168.10.1");
   run(e, "WS-001", "ping 10.0.0.10");
   const failPing = run(e, "WS-001", "ping intranet.horizon").join("\n");
-  assert(failPing.includes("échec") || failPing.toLowerCase().includes("dns"), "DNS failure observed before fix");
+  assert(failPing.includes("Ã©chec") || failPing.toLowerCase().includes("dns"), "DNS failure observed before fix");
   run(e, "WS-001", "cat /etc/resolv.conf");
   e.writeFile("WS-001", "/etc/resolv.conf", "nameserver 10.0.0.10\n");
   const okPing = run(e, "WS-001", "ping intranet.horizon").join("\n");
@@ -108,7 +108,7 @@ console.log("\n[2] MISSION c1_mission");
   const afterFix = run(e, "PC-MARIE", "ip addr").join("\n");
   assert(afterFix.includes("192.168.20.45"), "DHCP lease obtained");
   run(e, "PC-MARIE", "ping 10.0.0.10");
-  e.sendChat("itsupport", "PC-MARIE réparé, bail DHCP obtenu.");
+  e.sendChat("itsupport", "PC-MARIE rÃ©parÃ©, bail DHCP obtenu.");
 
   const m = e.state.missions["c1_mission"];
   assert(m.status === "completed", `mission completed (status=${m.status})`);
@@ -138,7 +138,7 @@ for (const variant of ["dns", "gw", "link"] as const) {
   run(e, "PC-MARIE", "sudo systemctl restart systemd-networkd");
   run(e, "PC-MARIE", "sudo dhclient eth0");
   run(e, "PC-MARIE", "ping 10.0.0.10");
-  e.sendChat("itsupport", "réparé");
+  e.sendChat("itsupport", "rÃ©parÃ©");
 
   e.startMission("c1_sim", variant);
   const sim = e.state.missions["c1_sim"];
@@ -171,7 +171,7 @@ for (const variant of ["dns", "gw", "link"] as const) {
   }
   const verify = run(e, "PC-PAUL", "ping 10.0.0.10").join("\n");
   assert(noLoss(verify), `[${variant}] connectivity verified`);
-  e.sendChat("itsupport", "rapport: incident résolu");
+  e.sendChat("itsupport", "rapport: incident rÃ©solu");
   const s = e.state.missions["c1_sim"];
   assert(s.status === "completed", `[${variant}] sim completed (status=${s.status})`);
   assert(e.state.certificates.some((c) => c.titleKey === "Cyber Explorer"), `[${variant}] certificate issued`);
@@ -209,7 +209,7 @@ console.log("\n[4] ERROR PATH — restarting healthy DHCP server");
   run(e, "PC-MARIE", "sudo systemctl restart systemd-networkd");
   run(e, "PC-MARIE", "sudo dhclient eth0");
   run(e, "PC-MARIE", "ping 10.0.0.10");
-  e.sendChat("itsupport", "réparé");
+  e.sendChat("itsupport", "rÃ©parÃ©");
   assert(e.state.missions["c1_mission"].status === "completed", "mission still completable after error");
   assert(e.state.missions["c1_mission"].score < 100, "score penalized");
 }
@@ -278,14 +278,14 @@ function completeChapter1(e: GameEngine) {
   run(e, "PC-MARIE", "sudo systemctl restart systemd-networkd");
   run(e, "PC-MARIE", "sudo dhclient eth0");
   run(e, "PC-MARIE", "ping 10.0.0.10");
-  e.sendChat("itsupport", "réparé");
+  e.sendChat("itsupport", "rÃ©parÃ©");
   e.startMission("c1_sim", "dns");
   e.answerDecision("A");
   run(e, "PC-PAUL", "ip addr");
   run(e, "PC-PAUL", "ip route");
   e.writeFile("PC-PAUL", "/etc/resolv.conf", "nameserver 10.0.0.10\n");
   run(e, "PC-PAUL", "ping 10.0.0.10");
-  e.sendChat("itsupport", "rapport: incident résolu");
+  e.sendChat("itsupport", "rapport: incident rÃ©solu");
 }
 
 function completeChapter2(e: GameEngine) {
@@ -318,13 +318,54 @@ function completeChapter2(e: GameEngine) {
   fixNourPlan(e);
   run(e, "PC-NOUR", "ping 192.168.40.1");
   run(e, "PC-NOUR", "ping 10.0.0.10");
-  e.sendChat("itsupport", "rapport: plan VLAN 40 rétabli");
+  e.sendChat("itsupport", "rapport: plan VLAN 40 rÃ©tabli");
 }
 
 function completeChapter2Ready(): GameEngine {
   const e = newEngine();
   completeChapter2(e);
   return e;
+}
+
+function completeC3Lab(e: GameEngine) {
+  e.startMission("c3_lab");
+  run(e, "WS-001", "sudo iptables -L");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "sudo iptables -D FW-LAB");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+}
+
+function completeC3Port(e: GameEngine) {
+  e.startMission("c3_port");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.c3_port.mailTicketSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "SW-01", "show vlan");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "SW-01", "sudo switchport Gi0/14 vlan 40");
+  run(e, "PC-NOUR", "ping 192.168.40.1");
+  run(e, "PC-NOUR", "ping 10.0.0.10");
+  e.sendChat("itsupport", "Gi0/14 VLAN 40");
+}
+
+function completeC3Nat(e: GameEngine) {
+  e.startMission("c3_nat");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.c3_nat.mailTicketSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo iptables -L");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo iptables -D FW-NAT");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+  e.sendChat("itsupport", "FW-NAT retirÃ©");
+}
+
+function completeC3ThroughNat(e: GameEngine) {
+  completeC3Lab(e);
+  completeC3Port(e);
+  completeC3Nat(e);
 }
 
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
@@ -404,7 +445,7 @@ console.log("\n[8] CHAPTER 2 ERROR — leave Nour on VLAN 10");
   fixNourPlan(e);
   run(e, "PC-NOUR", "ping 192.168.40.1");
   run(e, "PC-NOUR", "ping 10.0.0.10");
-  e.sendChat("itsupport", "corrigé malgré tout");
+  e.sendChat("itsupport", "corrigÃ© malgrÃ© tout");
   assert(e.state.missions["c2_mission"].status === "completed", "mission still completable");
   assert(e.state.missions["c2_mission"].score < 100, "score penalized");
 }
@@ -444,7 +485,7 @@ for (const variant of ["mask", "gw", "ip"] as const) {
   const verify = run(e, "PC-NOUR", "ping 192.168.40.1").join("\n");
   assert(noLoss(verify), `[${variant}] gateway verified`);
   run(e, "PC-NOUR", "ping 10.0.0.10");
-  e.sendChat("itsupport", "rapport: plan VLAN 40 rétabli");
+  e.sendChat("itsupport", "rapport: plan VLAN 40 rÃ©tabli");
   const s = e.state.missions["c2_sim"];
   assert(s.status === "completed", `[${variant}] sim completed (status=${s.status})`);
   assert(
@@ -504,18 +545,85 @@ console.log("\n[12] CHAPTER 3 LAB c3_lab");
   const dns = run(e, "WS-001", "ping 10.0.0.10").join("\n");
   assert(noLoss(dns), "DNS still reachable");
   assert(e.state.missions["c3_lab"].status === "completed", `c3_lab completed (status=${e.state.missions["c3_lab"].status})`);
-  assert(e.state.missions["c3_mission"].status === "available", "c3_mission unlocked");
+  assert(e.state.missions["c3_port"].status === "available", "c3_port unlocked");
 }
 
-console.log("\n[13] CHAPTER 3 MISSION c3_mission");
+console.log("\n[12b] OLD SAVE — missing c3_lab runtime still starts after chapter 2");
 {
   const e = completeChapter2Ready();
+  delete e.state.missions["c3_lab"];
+  delete e.state.missions["c3_port"];
+  delete e.state.missions["c3_nat"];
+  delete e.state.missions["c3_mission"];
+  delete e.state.missions["c3_sim"];
   e.startMission("c3_lab");
-  run(e, "WS-001", "sudo iptables -L");
-  run(e, "WS-001", "ping 192.168.20.45");
-  run(e, "WS-001", "sudo iptables -D FW-LAB");
-  run(e, "WS-001", "ping 192.168.20.45");
+  assert(e.state.activeMissionId === "c3_lab", "c3_lab starts from a save that lacked chapter 3 runtimes");
+}
+
+console.log("\n[13] CHAPTER 3 PORT c3_port");
+{
+  const e = completeChapter2Ready();
+  completeC3Lab(e);
+  e.startMission("c3_port");
+  assert(e.state.activeMissionId === "c3_port", "c3_port started");
+  assert(e.state.activeWindow === "mail", "mail opens for the switch ticket");
+  assert(e.state.pendingDecision === null, "call waits until mail is read");
+  assert(
+    e.state.world.switchPorts.find((p) => p.id === "Gi0/14")?.vlan === 10,
+    "Nour's port starts on VLAN 10"
+  );
+  const isolated = run(e, "PC-NOUR", "ping 192.168.40.1").join("\n");
+  assert(allLoss(isolated), "correct IP on wrong VLAN cannot reach floor gateway");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c3_port.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  assert(e.state.pendingDecision?.id === "c3p_call", "Nour calls after the ticket is read");
+  e.answerDecision("A");
+  const shown = run(e, "SW-01", "show interfaces status").join("\n");
+  assert(shown.includes("Gi0/14"), "switch port table lists Gi0/14");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "SW-01", "sudo switchport Gi0/14 vlan 40");
+  assert(e.state.world.switchPorts.find((p) => p.id === "Gi0/14")?.vlan === 40, "port moved to VLAN 40");
+  const gw = run(e, "PC-NOUR", "ping 192.168.40.1").join("\n");
+  assert(noLoss(gw), "floor gateway reachable after VLAN fix");
+  run(e, "PC-NOUR", "ping 10.0.0.10");
+  e.sendChat("itsupport", "port VLAN 40 ok");
+  assert(e.state.missions["c3_port"].status === "completed", "c3_port completed");
+  assert(e.state.missions["c3_nat"].status === "available", "c3_nat unlocked");
+}
+
+console.log("\n[14] CHAPTER 3 NAT c3_nat");
+{
+  const e = completeChapter2Ready();
+  completeC3Lab(e);
+  completeC3Port(e);
+  e.startMission("c3_nat");
+  assert(e.state.activeMissionId === "c3_nat", "c3_nat started");
+  assert(
+    e.state.mails.some((m) => m.subjectKey === "missions.c3_nat.mailTicketSubject"),
+    "IT-3120 mail is in the inbox"
+  );
+  assert(e.state.pendingDecision === null, "call waits until mail is read");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c3_nat.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  const listed = run(e, "WS-001", "sudo iptables -L").join("\n");
+  assert(listed.includes("FW-NAT"), "FW-NAT listed");
+  const open = run(e, "WS-001", "ping 192.168.20.45").join("\n");
+  assert(noLoss(open), "published host is reachable");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo iptables -D FW-NAT");
+  const closed = run(e, "WS-001", "ping 192.168.20.45").join("\n");
+  assert(allLoss(closed), "payroll host unpublished");
   run(e, "WS-001", "ping 10.0.0.10");
+  e.sendChat("itsupport", "NAT retirÃ©");
+  assert(e.state.missions["c3_nat"].status === "completed", "c3_nat completed");
+  assert(e.state.missions["c3_mission"].status === "available", "c3_mission unlocked after NAT");
+}
+
+console.log("\n[15] CHAPTER 3 MISSION c3_mission");
+{
+  const e = completeChapter2Ready();
+  completeC3ThroughNat(e);
   e.startMission("c3_mission");
   assert(e.state.activeMissionId === "c3_mission", "c3_mission started");
   assert(
@@ -534,20 +642,15 @@ console.log("\n[13] CHAPTER 3 MISSION c3_mission");
   const closed = run(e, "WS-001", "ping 192.168.20.45").join("\n");
   assert(allLoss(closed), "Finance closed after vendor hole removed");
   run(e, "WS-001", "ping 10.0.0.10");
-  e.sendChat("itsupport", "trou FW-VENDOR fermé, DNS OK");
+  e.sendChat("itsupport", "trou FW-VENDOR fermÃ©, DNS OK");
   assert(e.state.missions["c3_mission"].status === "completed", `c3_mission completed (status=${e.state.missions["c3_mission"].status})`);
   assert(e.state.missions["c3_sim"].status === "available", "c3_sim unlocked");
 }
 
-console.log("\n[14] CHAPTER 3 ERROR — open any to Finance");
+console.log("\n[16] CHAPTER 3 ERROR — open any to Finance");
 {
   const e = completeChapter2Ready();
-  e.startMission("c3_lab");
-  run(e, "WS-001", "sudo iptables -L");
-  run(e, "WS-001", "ping 192.168.20.45");
-  run(e, "WS-001", "sudo iptables -D FW-LAB");
-  run(e, "WS-001", "ping 192.168.20.45");
-  run(e, "WS-001", "ping 10.0.0.10");
+  completeC3ThroughNat(e);
   e.startMission("c3_mission");
   const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c3_mission.mailTicketSubject")!;
   e.readMail(ticket.id);
@@ -563,20 +666,15 @@ console.log("\n[14] CHAPTER 3 ERROR — open any to Finance");
   run(e, "WS-001", "sudo iptables -D FW-ANY");
   run(e, "WS-001", "ping 192.168.20.45");
   run(e, "WS-001", "ping 10.0.0.10");
-  e.sendChat("itsupport", "corrigé malgré tout");
+  e.sendChat("itsupport", "corrigÃ© malgrÃ© tout");
   assert(e.state.missions["c3_mission"].status === "completed", "mission still completable");
   assert(e.state.missions["c3_mission"].score < 100, "score penalized");
 }
 
 for (const variant of ["any", "src", "wide"] as const) {
-  console.log(`\n[15] SIM c3_sim variant=${variant}`);
+  console.log(`\n[17] SIM c3_sim variant=${variant}`);
   const e = completeChapter2Ready();
-  e.startMission("c3_lab");
-  run(e, "WS-001", "sudo iptables -L");
-  run(e, "WS-001", "ping 192.168.20.45");
-  run(e, "WS-001", "sudo iptables -D FW-LAB");
-  run(e, "WS-001", "ping 192.168.20.45");
-  run(e, "WS-001", "ping 10.0.0.10");
+  completeC3ThroughNat(e);
   e.startMission("c3_mission");
   const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c3_mission.mailTicketSubject")!;
   e.readMail(ticket.id);
@@ -609,7 +707,7 @@ for (const variant of ["any", "src", "wide"] as const) {
   assert(allLoss(after), `[${variant}] Finance closed`);
   const dns = run(e, "WS-001", "ping 10.0.0.10").join("\n");
   assert(noLoss(dns), `[${variant}] DNS still up`);
-  e.sendChat("itsupport", "rapport: trou FORWARD fermé");
+  e.sendChat("itsupport", "rapport: trou FORWARD fermÃ©");
   const s = e.state.missions["c3_sim"];
   assert(s.status === "completed", `[${variant}] sim completed (status=${s.status})`);
   assert(
@@ -621,15 +719,10 @@ for (const variant of ["any", "src", "wide"] as const) {
   assert(e.state.chapter >= 4, `[${variant}] chapter advanced`);
 }
 
-console.log("\n[16] OLD SAVE — missing c3_mission runtime still starts and gets mail");
+console.log("\n[18] OLD SAVE — missing c3_mission runtime still starts and gets mail");
 {
   const e = completeChapter2Ready();
-  e.startMission("c3_lab");
-  run(e, "WS-001", "sudo iptables -L");
-  run(e, "WS-001", "ping 192.168.20.45");
-  run(e, "WS-001", "sudo iptables -D FW-LAB");
-  run(e, "WS-001", "ping 192.168.20.45");
-  run(e, "WS-001", "ping 10.0.0.10");
+  completeC3ThroughNat(e);
   delete e.state.missions["c3_mission"];
   delete e.state.missions["c3_sim"];
   e.startMission("c3_mission");

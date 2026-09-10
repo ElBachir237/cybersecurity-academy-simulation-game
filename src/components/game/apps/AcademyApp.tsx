@@ -8,7 +8,7 @@ import { MISSIONS } from "@/game/data/missions";
 
 export default function AcademyApp() {
   const { state, engine, t } = useGame();
-  const [chapterId, setChapterId] = useState(1);
+  const [chapterId, setChapterId] = useState(() => state.chapter || 1);
   const [theory, setTheory] = useState<string | null>(null);
   const [briefing, setBriefing] = useState<string | null>(null);
   const lang = state.profile?.lang ?? "fr";
@@ -19,6 +19,13 @@ export default function AcademyApp() {
   const subtitle = chapter.id === 2 ? t("chapter2.sub") : chapter.id === 3 ? t("chapter3.sub") : t("academy.sub");
   const completed = chapter.missionIds.filter((id) => state.completedMissions.includes(id)).length;
   const brief = briefing ? MISSIONS[briefing] : null;
+  const prereqOk = (id: string) => {
+    const def = MISSIONS[id];
+    if (!def) return false;
+    return def.prereq.every(
+      (p) => state.completedMissions.includes(p) || state.missions[p]?.status === "completed"
+    );
+  };
 
   return <div className="hz-academy-layout">
     <aside className="hz-academy-nav">
@@ -34,16 +41,19 @@ export default function AcademyApp() {
         <section className="hz-academy-section"><h2><Icon name="brain" size={16} />{t("academy.theory")}<small>{fr ? "L’essentiel avant d’agir" : "Just enough to take action"}</small></h2><div className="hz-theory-list">{chapter.theoryKeys.map((key) => <div key={key}><button type="button" aria-expanded={theory === key} onClick={() => setTheory(theory === key ? null : key)}><span>{t(`theory.${key}_title`)}</span><Icon name="chevronRight" size={15} className={theory === key ? "rotate-90" : ""} /></button>{theory === key && <p>{t(`theory.${key}_body`)}</p>}</div>)}</div></section>
         <section className="hz-academy-section"><h2><Icon name="target" size={16} />{fr ? "À vous de jouer" : "Put it into practice"}<small>{fr ? "Observer → agir → vérifier" : "Observe → act → verify"}</small></h2><div className="hz-mission-cards">{chapter.missionIds.map((id, index) => {
           const def = MISSIONS[id];
+          if (!def) return null;
           const runtime = state.missions[id];
-          const locked = runtime?.status === "locked";
+          const locked = !prereqOk(id) && runtime?.status !== "available" && runtime?.status !== "active" && runtime?.status !== "completed";
           const active = state.activeMissionId === id;
+          const missing = def.prereq.filter((p) => !state.completedMissions.includes(p) && state.missions[p]?.status !== "completed");
           return <article key={id} className="hz-mission-card" data-testid={`mission-${id}`} data-active={active}>
             <div className="hz-mission-card-meta"><span>{String(index + 1).padStart(2, "0")} · {t(def.kind === "lab" ? "academy.lab" : def.kind === "simulation" ? "academy.sim" : "academy.mission")}</span><span><Icon name="clock" size={11} />{def.estimateMin} min</span></div>
             <h3>{t(def.titleKey)}</h3>
             <div className="hz-mission-skills">{def.skillIds.map((skill) => <span key={skill}>{SKILLS.find((item) => item.id === skill)?.label[lang] ?? skill}</span>)}</div>
             {runtime?.bestScore !== undefined && <p className="hz-best-score">{t("academy.bestScore")} : {runtime.bestScore}/100</p>}
+            {locked && missing.length > 0 && <p className="hz-best-score">{t("academy.prereqMissing")} : {missing.map((p) => t(MISSIONS[p]?.titleKey ?? p)).join(", ")}</p>}
             <button type="button" className={`hz-btn ${locked ? "hz-btn-ghost" : "hz-btn-primary"}`} disabled={locked} onClick={() => {
-              if (locked || !runtime) return;
+              if (locked) return;
               if (active) engine.startMission(id);
               else setBriefing(id);
             }}><Icon name={locked ? "lock" : active ? "play" : runtime?.status === "completed" ? "retry" : "arrowRight"} size={14} />{locked ? t("common.locked") : active ? t("academy.resume") : runtime?.status === "completed" ? t("common.retry") : t("academy.start")}</button>

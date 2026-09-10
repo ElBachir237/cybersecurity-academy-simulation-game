@@ -156,7 +156,7 @@ export default function Desktop() {
         <section className="hz-mission-strip">
           <span className="hz-mission-icon"><Icon name={mission ? "target" : "building"} size={22} /></span>
           <div className="hz-mission-copy">
-            <div className="hz-eyebrow">{fr ? "CHAPITRE" : "CHAPTER"} {state.chapter}<span>/</span>{state.chapter === 1 ? "FIRST DAY" : "NETWORK FOUNDATIONS"}{mission && <span className="hz-mission-live">{fr ? "EN COURS" : "IN PROGRESS"}</span>}</div>
+            <div className="hz-eyebrow">{fr ? "CHAPITRE" : "CHAPTER"} {state.chapter}<span>/</span>{state.chapter === 1 ? "FIRST DAY" : state.chapter === 3 ? t("chapter3.title").toUpperCase() : t("chapter2.title").toUpperCase()}{mission && <span className="hz-mission-live">{fr ? "EN COURS" : "IN PROGRESS"}</span>}</div>
             <h1>{missionDef ? t(missionDef.titleKey) : `${fr ? "Bienvenue" : "Welcome"}, ${state.profile?.name ?? ""}.`}</h1>
             <p>{state.currentObjective ? t(state.currentObjective) : t("hud.noObjective")}</p>
           </div>

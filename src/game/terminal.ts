@@ -12,10 +12,14 @@ import {
   INTERNAL_SITES,
   firewallAllows,
   formatFwList,
+  formatSwitchPorts,
+  formatVlanTable,
   ipInCidr,
+  l2Allowed,
   seedFwRules,
+  seedSwitchPorts,
 } from "./data/world";
-import type { FwRule } from "./types";
+import type { FwRule, SwitchPort } from "./types";
 
 export interface TermSignals {
   cmd: string;
@@ -85,10 +89,13 @@ function pathTo(target: string, host: HostRuntime, state: GameState): PathResult
   if (!iface || iface.state !== "up" || !iface.ip) return "no-iface";
   if (target === iface.ip) return "ok";
   if (target.startsWith("127.")) return "ok";
-  if (iface.cidr && sameSubnet(target, iface.ip, iface.cidr)) return "ok";
+  if (iface.cidr && sameSubnet(target, iface.ip, iface.cidr)) {
+    return l2Allowed(host, target, state) ? "ok" : "no-route";
+  }
   if (!iface.gw || !iface.cidr || !sameSubnet(iface.gw, iface.ip, iface.cidr)) {
     return "no-route";
   }
+  if (!l2Allowed(host, iface.gw, state)) return "no-route";
   let gwExists = false;
   for (const h of Object.values(state.world.hosts)) {
     for (const i of Object.values(h.ifaces)) {
@@ -333,6 +340,53 @@ function cmdIptables(args: string[], state: GameState, sudo: boolean): string[] 
   ];
 }
 
+function ensureSwitchPorts(state: GameState): SwitchPort[] {
+  if (!Array.isArray(state.world.switchPorts) || state.world.switchPorts.length === 0) {
+    state.world.switchPorts = seedSwitchPorts();
+  }
+  return state.world.switchPorts;
+}
+
+function cmdShow(args: string[], host: HostRuntime, state: GameState): string[] {
+  if (host.id !== "SW-01") {
+    return ["show: disponible sur SW-01 — sélectionnez le commutateur dans le terminal."];
+  }
+  const ports = ensureSwitchPorts(state);
+  const joined = args.join(" ").toLowerCase();
+  if (!args.length || joined.startsWith("vlan")) return formatVlanTable(ports);
+  if (
+    joined.startsWith("int") ||
+    joined.includes("status") ||
+    joined.startsWith("interfaces") ||
+    joined.startsWith("port")
+  ) {
+    return formatSwitchPorts(ports);
+  }
+  return ["show: usage: show vlan | show interfaces status"];
+}
+
+function cmdSwitchport(args: string[], host: HostRuntime, state: GameState, sudo: boolean): string[] {
+  if (host.id !== "SW-01") {
+    return ["switchport: disponible sur SW-01 — sélectionnez le commutateur dans le terminal."];
+  }
+  if (!sudo) return ["switchport: Permission denied"];
+  const ports = ensureSwitchPorts(state);
+  const portRaw = args[0];
+  const vlanIdx = args.findIndex((a) => a.toLowerCase() === "vlan");
+  const vlan = Number(vlanIdx >= 0 ? args[vlanIdx + 1] : args[1]);
+  if (!portRaw || !Number.isInteger(vlan)) {
+    return ["switchport: usage: sudo switchport Gi0/14 vlan 40"];
+  }
+  if (![10, 20, 30, 40].includes(vlan)) {
+    return ["switchport: VLAN must be 10, 20, 30 or 40"];
+  }
+  const port = ports.find((p) => p.id.toLowerCase() === portRaw.toLowerCase());
+  if (!port) return [`switchport: no such port ${portRaw}`];
+  port.vlan = vlan;
+  host.logs.push(`Sep 12 sw-01: ${port.id} access vlan ${vlan}`);
+  return [`${port.id} access VLAN ${vlan}`];
+}
+
 // ---------------- Command: ip ----------------
 function cmdIp(args: string[], host: HostRuntime): string[] {
   const sub = args[0];
@@ -546,6 +600,8 @@ export function execTerminal(
       out.push("  sudo dhclient <iface>                — demander un bail DHCP");
       out.push("  sudo ip link set <iface> up|down     — activer une interface");
       out.push("  sudo iptables -L | -D <id> | -A ...  — politique FORWARD (simulée)");
+      out.push("  show vlan | show interfaces status   — ports du commutateur (SW-01)");
+      out.push("  sudo switchport Gi0/14 vlan 40       — VLAN d'accès (SW-01)");
       out.push("  clear | history                      — écran / historique");
       return { output: out, signals };
     }
@@ -714,6 +770,12 @@ export function execTerminal(
     }
     case "iptables":
       out.push(...cmdIptables(args, state, sudo));
+      break;
+    case "show":
+      out.push(...cmdShow(args, host, state));
+      break;
+    case "switchport":
+      out.push(...cmdSwitchport(args, host, state, sudo));
       break;
     case "ssh":
       out.push(`ssh: ${t("terminal.sshDenied")}`);

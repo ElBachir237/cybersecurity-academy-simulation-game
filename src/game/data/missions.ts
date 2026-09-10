@@ -25,6 +25,7 @@ import {
   FLOOR4_CIDR,
   firewallAllows,
   seedFwRules,
+  seedSwitchPorts,
 } from "./world";
 
 // ---------------- event matching helpers ----------------
@@ -1423,15 +1424,29 @@ function resetFw(fx: FxApi, extra: FwRule[]) {
   });
 }
 
+function allowRule(id: string, src: string, dst: string, comment: string): FwRule {
+  return { id, action: "allow", src, dst, proto: "any", comment };
+}
+
 function allowFinance(id: string, src: string, comment: string): FwRule {
-  return {
-    id,
-    action: "allow",
-    src,
-    dst: FINANCE_CIDR,
-    proto: "any",
-    comment,
-  };
+  return allowRule(id, src, FINANCE_CIDR, comment);
+}
+
+function setAccessVlan(fx: FxApi, portId: string, vlan: number, hostId?: string) {
+  fx.setWorld((w) => {
+    if (!w.switchPorts?.length) w.switchPorts = seedSwitchPorts();
+    const port = w.switchPorts.find((p) => p.id === portId);
+    if (port) {
+      port.vlan = vlan;
+      if (hostId) port.hostId = hostId;
+    } else {
+      w.switchPorts.push({ id: portId, vlan, hostId, state: "up" });
+    }
+  });
+}
+
+function portVlan(state: GameState, portId: string): number | undefined {
+  return state.world.switchPorts?.find((p) => p.id === portId)?.vlan;
 }
 
 function financeHoles(state: GameState): FwRule[] {
@@ -1571,6 +1586,558 @@ const c3_lab: MissionDef = {
 };
 
 // ============================================================
+// CHAPTER 3 — MISSION: wrong access VLAN on SW-01
+// ============================================================
+const c3_port: MissionDef = {
+  id: "c3_port",
+  chapter: 3,
+  kind: "mission",
+  skillIds: ["switching", "vlan", "network_diag"],
+  prereq: ["c3_lab"],
+  difficulty: 2,
+  hasVariants: false,
+  estimateMin: 14,
+  titleKey: "missions.c3_port.title",
+  briefKey: "missions.c3_port.brief",
+  onStart: (fx, state) => {
+    ensureVlan40(fx, state);
+    setNourAddr(
+      fx,
+      VLAN40.hostIp,
+      VLAN40.cidr,
+      VLAN40.gw,
+      "Sep 12 15:10:02 pc-nour systemd-networkd: eth0: 192.168.40.24/26 (plan OK, port still VLAN 10)"
+    );
+    setAccessVlan(fx, "Gi0/14", 10, "PC-NOUR");
+    fx.setWorld((w) => {
+      w.enforceAccessVlan = true;
+      w.tickets = w.tickets.filter((t) => t.id !== "IT-3110");
+      w.tickets.push({
+        id: "IT-3110",
+        severity: "medium",
+        titleKey: "missions.c3_port.mailTicketSubject",
+        from: "Nour Benali (Produit)",
+        status: "open",
+        createdAt: state.timeMin,
+        relatedHost: "PC-NOUR",
+      });
+    });
+    fx.mail({
+      from: "itsd",
+      subjectKey: "missions.c3_port.mailTicketSubject",
+      bodyKey: "missions.c3_port.mailTicketBody",
+    });
+    fx.chat("itsupport", "nour", fx.t("missions.c3_port.chatNour1"));
+    fx.notify({
+      severity: "high",
+      source: "IT Service Desk",
+      titleKey: "missions.c3_port.mailTicketSubject",
+      kind: "it",
+      linkMission: "c3_port",
+    });
+  },
+  steps: [
+    {
+      id: "brief",
+      type: "brief",
+      enter: (fx) => {
+        fx.objective("missions.c3_port.obj1");
+      },
+    },
+    {
+      id: "tasks",
+      type: "tasks",
+      objectiveKey: "missions.c3_port.obj2",
+      tasks: [
+        { id: "t1", labelKey: "missions.c3_port.t1", hintKey: "missions.c3_port.h1" },
+        { id: "t2", labelKey: "missions.c3_port.t2", hintKey: "missions.c3_port.h2" },
+        { id: "t3", labelKey: "missions.c3_port.t3", hintKey: "missions.c3_port.h3" },
+        { id: "t4", labelKey: "missions.c3_port.t4", hintKey: "missions.c3_port.h4" },
+        { id: "t5", labelKey: "missions.c3_port.t5", hintKey: "missions.c3_port.h5" },
+        { id: "t6", labelKey: "missions.c3_port.t6", hintKey: "missions.c3_port.h6" },
+      ],
+      handle: ({ fx, state, event: e, mission }) => {
+        const done: string[] = [];
+        if (e.type === "mail-read" || (e.type === "chat-sent" && e.channel === "itsupport"))
+          done.push("t1");
+        if (
+          (done.includes("t1") || mission.tasks["t1"]?.done) &&
+          !mission.decisions["c3p_call"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c3p_call",
+            kind: "call",
+            speaker: "nour",
+            contextKey: "missions.c3_port.callContext",
+            questionKey: "missions.c3_port.callQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c3_port.callA",
+                correct: true,
+                consequenceKey: "missions.c3_port.callConsequenceA",
+                whyKey: "missions.c3_port.callConsequenceA",
+                rep: 3,
+              },
+              {
+                id: "B",
+                labelKey: "missions.c3_port.callB",
+                consequenceKey: "missions.c3_port.callConsequenceB",
+                whyKey: "missions.c3_port.callConsequenceB",
+                rep: -3,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c3_port.callC",
+                consequenceKey: "missions.c3_port.callConsequenceC",
+                whyKey: "missions.c3_port.callConsequenceC",
+                rep: -5,
+              },
+            ],
+          });
+        }
+        if (
+          e.type === "cmd" &&
+          e.hostId === "SW-01" &&
+          (cmdIs(e, "show") || cmdIs(e, "switchport"))
+        )
+          done.push("t2");
+        if (
+          (done.includes("t2") || mission.tasks["t2"]?.done) &&
+          mission.decisions["c3p_call"] &&
+          !mission.decisions["c3p_marc"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c3p_marc",
+            kind: "decision",
+            contextKey: "missions.c3_port.decisionContext",
+            questionKey: "missions.c3_port.decisionQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c3_port.decA",
+                consequenceKey: "missions.c3_port.decConsequenceA",
+                whyKey: "missions.c3_port.learningWhy",
+                rep: -6,
+                fx: (fxx, s) => {
+                  const rt = s.missions["c3_port"];
+                  if (rt && !rt.errorKeys.includes("left_wrong_port")) {
+                    rt.errors += 1;
+                    rt.errorKeys.push("left_wrong_port");
+                  }
+                  fxx.setLearning({
+                    titleKey: "missions.c3_port.learningTitle",
+                    impactKey: "missions.c3_port.learningImpact",
+                    whyKey: "missions.c3_port.learningWhy",
+                    checkKey: "missions.c3_port.learningCheck",
+                  });
+                  fxx.sound("alert");
+                },
+              },
+              {
+                id: "B",
+                labelKey: "missions.c3_port.decB",
+                correct: true,
+                consequenceKey: "missions.c3_port.decConsequenceB",
+                whyKey: "missions.c3_port.decConsequenceB",
+                rep: 4,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c3_port.decC",
+                consequenceKey: "missions.c3_port.decConsequenceC",
+                whyKey: "missions.c3_port.learningWhyIp",
+                rep: -5,
+                fx: (fxx, s) => {
+                  const rt = s.missions["c3_port"];
+                  if (rt && !rt.errorKeys.includes("cloned_vlan10_again")) {
+                    rt.errors += 1;
+                    rt.errorKeys.push("cloned_vlan10_again");
+                  }
+                  fxx.setLearning({
+                    titleKey: "missions.c3_port.learningTitleIp",
+                    impactKey: "missions.c3_port.learningImpactIp",
+                    whyKey: "missions.c3_port.learningWhyIp",
+                    checkKey: "missions.c3_port.learningCheckIp",
+                  });
+                  fxx.sound("alert");
+                },
+              },
+            ],
+          });
+        }
+        if (portVlan(state, "Gi0/14") === 40) done.push("t3");
+        if (
+          portVlan(state, "Gi0/14") === 40 &&
+          pingHost(e, "PC-NOUR", VLAN40.gw)
+        )
+          done.push("t4");
+        if (
+          portVlan(state, "Gi0/14") === 40 &&
+          pingHost(e, "PC-NOUR", DNS_IP)
+        )
+          done.push("t5");
+        if (
+          e.type === "chat-sent" &&
+          e.channel === "itsupport" &&
+          (mission.tasks["t5"]?.done || done.includes("t5"))
+        ) {
+          done.push("t6");
+          fx.chat("itsupport", "nour", fx.t("missions.c3_port.chatNour2"));
+          fx.sound("success");
+        }
+        const complete = ["t1", "t2", "t3", "t4", "t5", "t6"].every(
+          (id) => done.includes(id) || mission.tasks[id]?.done
+        );
+        return { doneTasks: done, complete };
+      },
+    },
+    {
+      id: "final",
+      type: "final",
+      enter: (fx) => {
+        fx.awardXp(140);
+        fx.skill("switching", "practice", 25);
+        fx.skill("vlan", "competent", 20);
+        fx.skill("network_diag", "practice", 10);
+        fx.notify({
+          severity: "info",
+          source: "Academy",
+          titleKey: "notifyContent.missionReady",
+          kind: "system",
+          linkMission: "c3_nat",
+        });
+        fx.sound("unlock");
+      },
+    },
+  ],
+  debrief: (_state, mission, t): DebriefData => {
+    const score = Math.max(50, 100 - mission.errors * 12 - mission.hintsUsed * 8);
+    const leftPort = mission.decisions["c3p_marc"] === "A";
+    const clonedIp = mission.decisions["c3p_marc"] === "C";
+    const errors: DebriefData["errors"] = [];
+    if (leftPort) {
+      errors.push({
+        whatKey: "missions.c3_port.learningTitle",
+        whyKey: "missions.c3_port.learningWhy",
+      });
+    }
+    if (clonedIp) {
+      errors.push({
+        whatKey: "missions.c3_port.learningTitleIp",
+        whyKey: "missions.c3_port.learningWhyIp",
+      });
+    }
+    return {
+      missionId: "c3_port",
+      titleKey: "missions.c3_port.title",
+      outcome: errors.length || mission.hintsUsed ? "partial" : "success",
+      score,
+      maxScore: 100,
+      errors,
+      skillsValidated: [
+        { id: "switching", level: "practice" },
+        { id: "vlan", level: "competent" },
+      ],
+      skillsToReview: errors.length ? ["switching"] : [],
+      methodKey: "missions.c3_port.method",
+      nextStepKey: "missions.c3_port.next",
+      report: [
+        t("missions.c3_port.reportSubject"),
+        "------------------------------------------------------------",
+        `Score: ${score}/100`,
+        "Gi0/14 → VLAN 40. IP was already on plan; the port was not.",
+        "------------------------------------------------------------",
+      ].join("\n"),
+    };
+  },
+};
+
+// ============================================================
+// CHAPTER 3 — MISSION: NAT / host ACL too open
+// ============================================================
+const c3_nat: MissionDef = {
+  id: "c3_nat",
+  chapter: 3,
+  kind: "mission",
+  skillIds: ["firewall", "seg_arch", "defense_depth"],
+  prereq: ["c3_port"],
+  difficulty: 2,
+  hasVariants: false,
+  estimateMin: 14,
+  titleKey: "missions.c3_nat.title",
+  briefKey: "missions.c3_nat.brief",
+  onStart: (fx, state) => {
+    ensureMarieOnline(fx);
+    resetFw(fx, [
+      allowRule(
+        "FW-NAT",
+        "0.0.0.0/0",
+        `${MARIE_IP}/32`,
+        "vendor NAT — publish payroll host"
+      ),
+    ]);
+    fx.setWorld((w) => {
+      w.tickets = w.tickets.filter((t) => t.id !== "IT-3120" && t.id !== "IT-3121");
+      w.tickets.push({
+        id: "IT-3120",
+        severity: "high",
+        titleKey: "missions.c3_nat.mailTicketSubject",
+        from: "Soriya Chan (SOC)",
+        status: "open",
+        createdAt: state.timeMin,
+        relatedHost: "PC-MARIE",
+      });
+    });
+    fx.mail({
+      from: "itsd",
+      subjectKey: "missions.c3_nat.mailTicketSubject",
+      bodyKey: "missions.c3_nat.mailTicketBody",
+    });
+    fx.chat("itsupport", "soriya", fx.t("missions.c3_nat.chatSoriya1"));
+    fx.chat("itsupport", "marc", fx.t("missions.c3_nat.chatMarc1"));
+    fx.notify({
+      severity: "critical",
+      source: "SOC",
+      titleKey: "missions.c3_nat.mailTicketSubject",
+      kind: "soc",
+      linkMission: "c3_nat",
+    });
+  },
+  steps: [
+    {
+      id: "brief",
+      type: "brief",
+      enter: (fx) => {
+        fx.objective("missions.c3_nat.obj1");
+      },
+    },
+    {
+      id: "tasks",
+      type: "tasks",
+      objectiveKey: "missions.c3_nat.obj2",
+      tasks: [
+        { id: "t1", labelKey: "missions.c3_nat.t1", hintKey: "missions.c3_nat.h1" },
+        { id: "t2", labelKey: "missions.c3_nat.t2", hintKey: "missions.c3_nat.h2" },
+        { id: "t3", labelKey: "missions.c3_nat.t3", hintKey: "missions.c3_nat.h3" },
+        { id: "t4", labelKey: "missions.c3_nat.t4", hintKey: "missions.c3_nat.h4" },
+        { id: "t5", labelKey: "missions.c3_nat.t5", hintKey: "missions.c3_nat.h5" },
+        { id: "t6", labelKey: "missions.c3_nat.t6", hintKey: "missions.c3_nat.h6" },
+      ],
+      handle: ({ fx, state, event: e, mission }) => {
+        const done: string[] = [];
+        if (e.type === "mail-read" || (e.type === "chat-sent" && e.channel === "itsupport"))
+          done.push("t1");
+        if (
+          (done.includes("t1") || mission.tasks["t1"]?.done) &&
+          !mission.decisions["c3n_call"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c3n_call",
+            kind: "call",
+            speaker: "soriya",
+            contextKey: "missions.c3_nat.callContext",
+            questionKey: "missions.c3_nat.callQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c3_nat.callA",
+                correct: true,
+                consequenceKey: "missions.c3_nat.callConsequenceA",
+                whyKey: "missions.c3_nat.callConsequenceA",
+                rep: 3,
+              },
+              {
+                id: "B",
+                labelKey: "missions.c3_nat.callB",
+                consequenceKey: "missions.c3_nat.callConsequenceB",
+                whyKey: "missions.c3_nat.callConsequenceB",
+                rep: -4,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c3_nat.callC",
+                consequenceKey: "missions.c3_nat.callConsequenceC",
+                whyKey: "missions.c3_nat.callConsequenceC",
+                rep: -5,
+              },
+            ],
+          });
+        }
+        if (iptablesList(e) || pingHost(e, "WS-001", MARIE_IP)) done.push("t2");
+        if (
+          (done.includes("t2") || mission.tasks["t2"]?.done) &&
+          mission.decisions["c3n_call"] &&
+          !mission.decisions["c3n_marc"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c3n_marc",
+            kind: "decision",
+            contextKey: "missions.c3_nat.decisionContext",
+            questionKey: "missions.c3_nat.decisionQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c3_nat.decA",
+                consequenceKey: "missions.c3_nat.decConsequenceA",
+                whyKey: "missions.c3_nat.learningWhy",
+                rep: -8,
+                fx: (fxx, s) => {
+                  const rt = s.missions["c3_nat"];
+                  if (rt && !rt.errorKeys.includes("kept_nat")) {
+                    rt.errors += 1;
+                    rt.errorKeys.push("kept_nat");
+                  }
+                  fxx.setWorld((w) => {
+                    w.tickets.push({
+                      id: "IT-3121",
+                      severity: "critical",
+                      titleKey: "missions.c3_nat.decConsequenceA",
+                      from: "Soriya Chan (SOC)",
+                      status: "open",
+                      createdAt: s.timeMin,
+                      relatedHost: "PC-MARIE",
+                    });
+                  });
+                  fxx.setLearning({
+                    titleKey: "missions.c3_nat.learningTitle",
+                    impactKey: "missions.c3_nat.learningImpact",
+                    whyKey: "missions.c3_nat.learningWhy",
+                    checkKey: "missions.c3_nat.learningCheck",
+                  });
+                  fxx.sound("alert");
+                },
+              },
+              {
+                id: "B",
+                labelKey: "missions.c3_nat.decB",
+                correct: true,
+                consequenceKey: "missions.c3_nat.decConsequenceB",
+                whyKey: "missions.c3_nat.decConsequenceB",
+                rep: 4,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c3_nat.decC",
+                consequenceKey: "missions.c3_nat.decConsequenceC",
+                whyKey: "missions.c3_nat.learningWhyWide",
+                rep: -6,
+                fx: (fxx, s) => {
+                  const rt = s.missions["c3_nat"];
+                  if (rt && !rt.errorKeys.includes("widened_nat")) {
+                    rt.errors += 1;
+                    rt.errorKeys.push("widened_nat");
+                  }
+                  fxx.setWorld((w) => {
+                    w.fwRules = [
+                      ...(w.fwRules ?? seedFwRules()).filter((r) => r.id !== "FW-ANY"),
+                      allowFinance("FW-ANY", "0.0.0.0/0", "widened NAT to whole Finance VLAN"),
+                    ];
+                  });
+                  fxx.setLearning({
+                    titleKey: "missions.c3_nat.learningTitleWide",
+                    impactKey: "missions.c3_nat.learningImpactWide",
+                    whyKey: "missions.c3_nat.learningWhyWide",
+                    checkKey: "missions.c3_nat.learningCheckWide",
+                  });
+                  fxx.sound("alert");
+                },
+              },
+            ],
+          });
+        }
+        if (iptablesDelete(e, "FW-NAT") || iptablesDelete(e, "FW-ANY")) done.push("t3");
+        const natGone = !(state.world.fwRules ?? []).some(
+          (r) => !r.sticky && r.action === "allow" && (r.id === "FW-NAT" || r.id === "FW-ANY" || r.src === "0.0.0.0/0")
+        );
+        if (natGone && financeSegmented(state)) done.push("t4");
+        if (
+          natGone &&
+          financeSegmented(state) &&
+          (pingHost(e, "WS-001", MARIE_IP) || pingHost(e, "WS-001", DNS_IP))
+        )
+          done.push("t5");
+        if (
+          e.type === "chat-sent" &&
+          e.channel === "itsupport" &&
+          (mission.tasks["t5"]?.done || done.includes("t5"))
+        ) {
+          done.push("t6");
+          fx.chat("itsupport", "soriya", fx.t("missions.c3_nat.chatSoriya2"));
+          fx.sound("success");
+        }
+        const complete = ["t1", "t2", "t3", "t4", "t5", "t6"].every(
+          (id) => done.includes(id) || mission.tasks[id]?.done
+        );
+        return { doneTasks: done, complete };
+      },
+    },
+    {
+      id: "final",
+      type: "final",
+      enter: (fx) => {
+        fx.awardXp(150);
+        fx.skill("firewall", "competent", 20);
+        fx.skill("seg_arch", "practice", 15);
+        fx.skill("defense_depth", "practice", 15);
+        fx.notify({
+          severity: "info",
+          source: "Academy",
+          titleKey: "notifyContent.missionReady",
+          kind: "system",
+          linkMission: "c3_mission",
+        });
+        fx.sound("unlock");
+      },
+    },
+  ],
+  debrief: (_state, mission, t): DebriefData => {
+    const score = Math.max(50, 100 - mission.errors * 12 - mission.hintsUsed * 8);
+    const kept = mission.decisions["c3n_marc"] === "A";
+    const wide = mission.decisions["c3n_marc"] === "C";
+    const errors: DebriefData["errors"] = [];
+    if (kept) {
+      errors.push({
+        whatKey: "missions.c3_nat.learningTitle",
+        whyKey: "missions.c3_nat.learningWhy",
+      });
+    }
+    if (wide) {
+      errors.push({
+        whatKey: "missions.c3_nat.learningTitleWide",
+        whyKey: "missions.c3_nat.learningWhyWide",
+      });
+    }
+    return {
+      missionId: "c3_nat",
+      titleKey: "missions.c3_nat.title",
+      outcome: errors.length || mission.hintsUsed ? "partial" : "success",
+      score,
+      maxScore: 100,
+      errors,
+      skillsValidated: [
+        { id: "firewall", level: "competent" },
+        { id: "seg_arch", level: "practice" },
+      ],
+      skillsToReview: errors.length ? ["firewall"] : [],
+      methodKey: "missions.c3_nat.method",
+      nextStepKey: "missions.c3_nat.next",
+      report: [
+        t("missions.c3_nat.reportSubject"),
+        "------------------------------------------------------------",
+        `Score: ${score}/100`,
+        "FW-NAT removed. Payroll host is no longer published to any.",
+        "------------------------------------------------------------",
+      ].join("\n"),
+    };
+  },
+};
+
+// ============================================================
 // CHAPTER 3 — MISSION: vendor /16 hole to Finance
 // ============================================================
 const c3_mission: MissionDef = {
@@ -1578,7 +2145,7 @@ const c3_mission: MissionDef = {
   chapter: 3,
   kind: "mission",
   skillIds: ["firewall", "seg_arch", "defense_depth"],
-  prereq: ["c3_lab"],
+  prereq: ["c3_nat"],
   difficulty: 2,
   hasVariants: false,
   estimateMin: 16,
@@ -2055,6 +2622,8 @@ export const MISSIONS: Record<string, MissionDef> = {
   c2_mission,
   c2_sim,
   c3_lab,
+  c3_port,
+  c3_nat,
   c3_mission,
   c3_sim,
 };
@@ -2071,6 +2640,8 @@ export const MISSION_ORDER = [
   "c2_mission",
   "c2_sim",
   "c3_lab",
+  "c3_port",
+  "c3_nat",
   "c3_mission",
   "c3_sim",
 ];

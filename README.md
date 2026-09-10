@@ -77,10 +77,12 @@ Boucle complète autour d’un **pare-feu FORWARD simulé** : défaut inter-VLAN
 | Mission | Type | Sujet |
 | --- | --- | --- |
 | **Trou dans le pare-feu** (`c3_lab`) | Lab | Règle `FW-LAB` (bureaux → Finance) : lister, observer, supprimer, vérifier |
+| **Le port n’est pas le VLAN** (`c3_port`) | Mission | `SW-01 Gi0/14` resté VLAN 10 alors que PC-NOUR est déjà en `192.168.40.24/26` |
+| **Le NAT du prestataire** (`c3_nat`) | Mission | Publication `0.0.0.0/0 → 192.168.20.45/32` ; ne pas élargir au VLAN Finance |
 | **Le raccourci du prestataire** (`c3_mission`) | Mission | Trou `192.168.0.0/16` → Finance ; mail IT ; appel après lecture ; mauvaise décision Marc = `0.0.0.0/0` |
 | **Simulation : segmentation** (`c3_sim`) | Simulation (examen) | Variantes `any` / `src` / `wide` |
 
-Commandes lab : `sudo iptables -L`, `sudo iptables -D <id>`, `sudo iptables -A FORWARD -s CIDR -d CIDR -j ACCEPT\|DROP`.
+Commandes lab : `sudo iptables -L`, `sudo iptables -D <id>`, `sudo iptables -A FORWARD -s CIDR -d CIDR -j ACCEPT|DROP`, et sur `SW-01` : `show vlan`, `show interfaces status`, `sudo switchport Gi0/14 vlan 40`.
 
 Réussir le chapitre débloque le certificat **Network Sentinel**.
 

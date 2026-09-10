@@ -5,7 +5,7 @@
 // tickets and NPC moods; the engine snapshots it into saves.
 // ============================================================
 
-import type { FwRule, GameState, HostRuntime } from "../types";
+import type { FwRule, GameState, HostRuntime, SwitchPort } from "../types";
 
 export const CORE_CIDR = "10.0.0.0/24";
 export const FINANCE_CIDR = "192.168.20.0/24";
@@ -68,8 +68,73 @@ export function firewallAllows(src: string, dst: string, state: GameState): bool
   if (ipInCidr(dst, CORE_CIDR)) return true;
   const a = userVlan(src);
   const b = userVlan(dst);
-  if (a && b && a !== b) return false;
+  if (b && a !== b) return false;
   return true;
+}
+
+export function vlanForIp(ip: string): number | null {
+  return userVlan(ip) ? Number(userVlan(ip)) : null;
+}
+
+export function seedSwitchPorts(): SwitchPort[] {
+  return [
+    { id: "Gi0/8", vlan: 10, hostId: "WS-001", state: "up" },
+    { id: "Gi0/12", vlan: 20, hostId: "PC-MARIE", state: "up" },
+    { id: "Gi0/14", vlan: 40, hostId: "PC-NOUR", state: "up" },
+    { id: "Gi0/16", vlan: 30, hostId: "PC-PAUL", state: "up" },
+    { id: "Gi0/20", vlan: 10, hostId: "AP-01", state: "up" },
+  ];
+}
+
+export function l2Allowed(host: HostRuntime, targetIp: string, state: GameState): boolean {
+  if (!state.world.enforceAccessVlan) return true;
+  const ports = state.world.switchPorts;
+  if (!ports?.length) return true;
+  const srcPort = ports.find((p) => p.hostId === host.id);
+  if (!srcPort) return true;
+  if (srcPort.state !== "up") return false;
+  const need = vlanForIp(targetIp);
+  if (need === null) return true;
+  let destHostId: string | undefined;
+  for (const [id, h] of Object.entries(state.world.hosts)) {
+    for (const i of Object.values(h.ifaces)) {
+      if (i.ip === targetIp) destHostId = id;
+    }
+  }
+  if (destHostId === "RTR-HQ" || destHostId === "SW-01") {
+    return srcPort.vlan === need;
+  }
+  const dstPort = destHostId ? ports.find((p) => p.hostId === destHostId) : undefined;
+  if (dstPort) return dstPort.state === "up" && srcPort.vlan === dstPort.vlan;
+  return srcPort.vlan === need;
+}
+
+export function formatSwitchPorts(ports: SwitchPort[]): string[] {
+  const lines = [
+    "Port      VLAN  Status  Host",
+    "--------------------------------",
+  ];
+  for (const p of ports) {
+    lines.push(
+      `${p.id.padEnd(9)} ${String(p.vlan).padEnd(5)} ${p.state.padEnd(7)} ${p.hostId ?? "-"}`
+    );
+  }
+  return lines;
+}
+
+export function formatVlanTable(ports: SwitchPort[]): string[] {
+  const names: Record<number, string> = {
+    10: "OFFICE",
+    20: "FINANCE",
+    30: "LOGISTICS",
+    40: "FLOOR4",
+  };
+  const lines = ["VLAN  Name", "----------------"];
+  for (const vlan of [10, 20, 30, 40]) {
+    const members = ports.filter((p) => p.vlan === vlan).map((p) => p.id).join(", ");
+    lines.push(`${String(vlan).padEnd(5)} ${names[vlan]}${members ? `  (${members})` : ""}`);
+  }
+  return lines;
 }
 
 export function formatFwList(rules: FwRule[]): string[] {
@@ -233,12 +298,13 @@ export function seedHosts(): Record<string, HostRuntime> {
       vlan10: { state: "up", dhcp: false, ip: "192.168.10.2", cidr: 24 },
       vlan20: { state: "up", dhcp: false, ip: "192.168.20.2", cidr: 24 },
       vlan30: { state: "up", dhcp: false, ip: "192.168.30.2", cidr: 24 },
+      vlan40: { state: "up", dhcp: false, ip: "192.168.40.2", cidr: 26 },
     },
     dns: ["10.0.0.10"],
     services: {},
     logs: [
       "Sep 12 08:00:00 sw-01: ports 1-24 active",
-      "Sep 12 08:00:00 sw-01: VLAN 10,20,30 trunk up",
+      "Sep 12 08:00:00 sw-01: VLAN 10,20,30,40 trunk up",
     ],
   });
 

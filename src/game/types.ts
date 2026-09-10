@@ -96,6 +96,13 @@ export interface FwRule {
   sticky?: boolean;
 }
 
+export interface SwitchPort {
+  id: string;
+  vlan: number;
+  hostId?: string;
+  state: "up" | "down";
+}
+
 export interface GameWorld {
   hosts: Record<string, HostRuntime>;
   dns: Record<string, string>; // name -> ip
@@ -105,6 +112,8 @@ export interface GameWorld {
   tickets: Ticket[];
   npc: Record<string, NpcState>;
   fwRules: FwRule[];
+  switchPorts: SwitchPort[];
+  enforceAccessVlan?: boolean;
 }
 
 // ---------------- Mail / Chat / Notifications ----------------

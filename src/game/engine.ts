@@ -39,6 +39,7 @@ import {
   initialMails,
   seedFwRules,
   seedHosts,
+  seedSwitchPorts,
 } from "./data/world";
 import {
   MISSIONS,
@@ -141,6 +142,7 @@ export function createInitialState(profile: Profile): GameState {
       financeOutage: false,
       intranetUp: true,
       fwRules: seedFwRules(),
+      switchPorts: seedSwitchPorts(),
       tickets: [
         {
           id: "IT-1041",
@@ -246,8 +248,18 @@ export function hydrateProgression(state: GameState): GameState {
   if (!fwRules.some((r) => r.id === "FW-CORE")) {
     fwRules = [...seedFwRules(), ...fwRules];
   }
+  const seededPorts = seedSwitchPorts();
+  const existingPorts = state.world?.switchPorts;
+  let switchPorts = Array.isArray(existingPorts) && existingPorts.length
+    ? seededPorts.map((seed) => existingPorts.find((p) => p.id === seed.id) ?? seed)
+    : seededPorts;
+  let chapter = state.chapter ?? 1;
+  if (completed.has("c1_sim")) chapter = Math.max(chapter, 2);
+  if (completed.has("c2_sim")) chapter = Math.max(chapter, 3);
+  if (completed.has("c3_sim")) chapter = Math.max(chapter, 4);
   return {
     ...state,
+    chapter,
     missions,
     completedMissions: [...completed],
     world: {
@@ -255,6 +267,7 @@ export function hydrateProgression(state: GameState): GameState {
       hosts,
       npc,
       fwRules,
+      switchPorts,
     },
   };
 }
@@ -882,8 +895,17 @@ export class GameEngine {
   startMission(id: string, forcedVariant?: string): void {
     this.state = hydrateProgression(this.state);
     const def = getMission(id);
+    if (!def) return;
+    if (!this.state.missions[id]) {
+      this.state.missions[id] = blankMission(id, "locked");
+      this.state = hydrateProgression(this.state);
+    }
     const rt = this.state.missions[id];
-    if (!def || !rt || rt.status === "locked") return;
+    if (!rt || rt.status === "locked") {
+      this.pushToast({ kind: "error", textKey: "academy.prereqMissing" });
+      this.bump();
+      return;
+    }
     if (rt.status === "active") {
       this.openMissionWorkspace(def);
       return;
