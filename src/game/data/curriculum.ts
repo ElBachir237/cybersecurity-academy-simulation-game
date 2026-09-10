@@ -197,7 +197,15 @@ export const CHAPTERS: ChapterDef[] = [
     theoryKeys: ["e8_contain", "e8_payroll", "e8_comms"],
     missionIds: ["e8_lab", "e8_ir", "e8_sim"],
   },
-  { id: 11, titleKey: "DFIR", status: "soon", theoryKeys: [], missionIds: [] },
+  {
+    id: 11,
+    titleKey: "chapter11",
+    subKey: "chapter11",
+    status: "released",
+    theoryKeys: ["e9_chain", "e9_acquire", "e9_scope"],
+    missionIds: ["e9_lab", "e9_scope", "e9_sim"],
+  },
+  { id: 12, titleKey: "AppSec", status: "soon", theoryKeys: [], missionIds: [] },
 ];
 
 export interface BadgeDef {
@@ -223,6 +231,7 @@ export const BADGES: BadgeDef[] = [
   { id: "rack_builder", icon: "layers", nameKey: "badges.rack_builder.name", descKey: "badges.rack_builder.desc" },
   { id: "soc_triage", icon: "shield", nameKey: "badges.soc_triage.name", descKey: "badges.soc_triage.desc" },
   { id: "sandbox_analyst", icon: "search", nameKey: "badges.sandbox_analyst.name", descKey: "badges.sandbox_analyst.desc" },
+  { id: "dfir_scribe", icon: "scroll", nameKey: "badges.dfir_scribe.name", descKey: "badges.dfir_scribe.desc" },
 ];
 
 export interface TitleDef {
@@ -324,6 +333,13 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 10",
     missionIds: ["e8_lab", "e8_ir", "e8_sim"],
     skills: ["incident_response", "defense_depth"],
+  },
+  {
+    id: "dfir_analyst",
+    titleKey: "DFIR Analyst",
+    level: "Chapter 11",
+    missionIds: ["e9_lab", "e9_scope", "e9_sim"],
+    skills: ["forensics", "timeline", "ioc"],
   },
 ];
 

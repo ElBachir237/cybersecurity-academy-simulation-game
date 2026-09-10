@@ -155,6 +155,7 @@ export function createInitialState(profile: Profile): GameState {
       workshop: emptyWorkshop(),
       socAlerts: emptySocAlerts(),
       iocs: [],
+      evidence: [],
       tickets: [
         {
           id: "IT-1041",
@@ -290,6 +291,7 @@ export function hydrateProgression(state: GameState): GameState {
   if (completed.has("e6_sim")) chapter = Math.max(chapter, 9);
   if (completed.has("e7_sim")) chapter = Math.max(chapter, 10);
   if (completed.has("e8_sim")) chapter = Math.max(chapter, 11);
+  if (completed.has("e9_sim")) chapter = Math.max(chapter, 12);
   const seededVhosts = seedVhosts();
   const vhosts = { ...seededVhosts, ...(state.world?.vhosts ?? {}) };
   const seededDir = seedDirectory();
@@ -313,6 +315,7 @@ export function hydrateProgression(state: GameState): GameState {
       workshop: state.world?.workshop ?? emptyWorkshop(),
       socAlerts: state.world?.socAlerts ?? emptySocAlerts(),
       iocs: Array.isArray(state.world?.iocs) ? state.world.iocs : [],
+      evidence: Array.isArray(state.world?.evidence) ? state.world.evidence : [],
     },
   };
 }
@@ -995,7 +998,12 @@ export class GameEngine {
       if (def.id !== "c2_lab") this.openApp("terminal");
       return;
     }
-    if (def.id.startsWith("e6_") || def.id.startsWith("e7_") || def.id.startsWith("e8_")) {
+    if (
+      def.id.startsWith("e6_") ||
+      def.id.startsWith("e7_") ||
+      def.id.startsWith("e8_") ||
+      def.id.startsWith("e9_")
+    ) {
       this.openApp("soc");
       this.openApp("terminal");
       if (!def.id.endsWith("_lab")) this.openApp("mail");
@@ -1218,6 +1226,7 @@ export class GameEngine {
     if (this.state.completedMissions.includes("e6_sim")) this.state.chapter = Math.max(this.state.chapter, 9);
     if (this.state.completedMissions.includes("e7_sim")) this.state.chapter = Math.max(this.state.chapter, 10);
     if (this.state.completedMissions.includes("e8_sim")) this.state.chapter = Math.max(this.state.chapter, 11);
+    if (this.state.completedMissions.includes("e9_sim")) this.state.chapter = Math.max(this.state.chapter, 12);
 
     this.recomputeRecommendation();
     this.state.activeMissionId = null;

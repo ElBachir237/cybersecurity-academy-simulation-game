@@ -719,6 +719,44 @@ function completeE8Ir(e: GameEngine) {
   e.sendChat("soc", "containment OK, paie intacte");
 }
 
+function completeE8Sim(e: GameEngine) {
+  e.startMission("e8_sim", "isolate");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e8_sim.mailSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo edr isolate PC-PAUL");
+  e.sendChat("soc", "rapport IR");
+}
+
+function completeChapter10Ready(): GameEngine {
+  const e = completeChapter9Ready();
+  completeE8Lab(e);
+  completeE8Ir(e);
+  completeE8Sim(e);
+  return e;
+}
+
+const TIMELINE_FILE = "/opt/horizon/evidence/paul.timeline";
+const EVIDENCE_HASH = "c8d1e4f70a2b3958671c0d4e9f2a5b8c3d6e1f4a7b0c2d5e8f1a4b7c0d3e6f9a";
+
+function completeE9Lab(e: GameEngine) {
+  e.startMission("e9_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo acquire PC-PAUL");
+  run(e, "WS-001", `cat ${TIMELINE_FILE}`);
+  e.sendChat("soc", "timeline lue, acces horiz0n");
+}
+
+function completeE9Scope(e: GameEngine) {
+  e.startMission("e9_scope");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e9_scope.mailSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "PC-PAUL", "grep horiz0n /var/log/syslog");
+  run(e, "WS-001", "sudo acquire PC-PAUL");
+  e.sendChat("soc", "scope Paul only, Marie hors chaine");
+}
+
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
 {
   const e = newEngine();
@@ -1972,6 +2010,116 @@ console.log("\n[51] OLD SAVE — missing e7/e8 runtimes still start");
   e.startMission("e7_lab");
   assert(e.state.activeMissionId === "e7_lab", "e7_lab starts from a save that lacked L2 runtimes");
   assert(Array.isArray(e.state.world.iocs), "iocs hydrated");
+}
+
+console.log("\n[52] CHAPTER 11 LAB e9_lab — start, acquire, timeline");
+{
+  const e = completeChapter10Ready();
+  assert(e.state.missions["e9_lab"].status === "available", "e9_lab unlocked after chapter 10");
+  e.startMission("e9_lab");
+  assert(e.state.activeMissionId === "e9_lab", "e9_lab starts");
+  assert(e.state.openWindows.includes("soc"), "SOC workspace opened on lab start");
+  assert(e.state.openWindows.includes("terminal"), "terminal opened on lab start");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  const acq = run(e, "WS-001", "sudo acquire PC-PAUL").join("\n");
+  assert(acq.includes("paul.timeline"), "acquire prints timeline path");
+  assert((e.state.world.evidence ?? []).includes("PC-PAUL"), "PC-PAUL in evidence");
+  const tl = run(e, "WS-001", `cat ${TIMELINE_FILE}`).join("\n");
+  assert(tl.includes("horiz0n") && tl.toLowerCase().includes("initial"), "timeline names initial access");
+  const lsEv = run(e, "WS-001", "ls /opt/horizon/evidence").join("\n");
+  assert(lsEv.includes("paul.timeline"), "evidence dir lists artifacts");
+  e.sendChat("soc", "timeline lue");
+  assert(e.state.missions["e9_lab"].status === "completed", "e9_lab completed");
+  assert(e.state.badges.includes("dfir_scribe"), "badge dfir_scribe");
+}
+
+console.log("\n[52b] CHAPTER 11 ERROR — wipe disk");
+{
+  const e = completeChapter10Ready();
+  e.startMission("e9_lab");
+  assert(e.state.pendingDecision?.id === "e9_wipe", "wipe-disk decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["e9_lab"].errorKeys.includes("wipe_disk"), "wipe_disk recorded");
+  run(e, "WS-001", "sudo acquire PC-PAUL");
+  run(e, "WS-001", `cat ${TIMELINE_FILE}`);
+  e.sendChat("soc", "quand meme");
+  assert(e.state.missions["e9_lab"].status === "completed", "still completable");
+  assert(e.state.missions["e9_lab"].score < 100, "score penalized");
+}
+
+console.log("\n[53] CHAPTER 11 MISSION e9_scope — mail + start");
+{
+  const e = completeChapter10Ready();
+  completeE9Lab(e);
+  e.startMission("e9_scope");
+  assert(e.state.activeMissionId === "e9_scope", "e9_scope starts");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e9_scope.mailSubject");
+  assert(!!mail, "e9_scope mail delivered on start");
+  assert(e.state.openWindows.includes("mail"), "mail workspace opened");
+  assert(e.state.openWindows.includes("soc"), "SOC opened for DFIR mission");
+  e.readMail(mail!.id);
+  assert(e.state.pendingDecision?.id === "e9s_dump", "scope call shown after mail-read");
+  e.answerDecision("A");
+  run(e, "PC-PAUL", "grep horiz0n /var/log/syslog");
+  run(e, "WS-001", "sudo acquire PC-PAUL");
+  e.sendChat("soc", "Paul only");
+  assert(e.state.missions["e9_scope"].status === "completed", "e9_scope completed");
+}
+
+console.log("\n[53b] CHAPTER 11 ERROR — image payroll");
+{
+  const e = completeChapter10Ready();
+  completeE9Lab(e);
+  e.startMission("e9_scope");
+  const mail = e.state.mails.find((m) => m.subjectKey === "missions.e9_scope.mailSubject")!;
+  e.readMail(mail.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo acquire PC-MARIE");
+  assert(e.state.missions["e9_scope"].errorKeys.includes("image_payroll"), "image_payroll recorded");
+  run(e, "WS-001", "sudo acquire PC-PAUL");
+  e.sendChat("soc", "scope corrige");
+  assert(e.state.missions["e9_scope"].status === "completed", "still completable after overscope");
+  assert(e.state.missions["e9_scope"].score < 100, "score penalized");
+}
+
+for (const variant of ["auth", "scope", "hash"] as const) {
+  console.log(`\n[54] SIM e9_sim variant=${variant}`);
+  const e = completeChapter10Ready();
+  completeE9Lab(e);
+  completeE9Scope(e);
+  e.startMission("e9_sim", variant);
+  assert(e.state.activeMissionId === "e9_sim", `[${variant}] sim starts`);
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.e9_sim.mailSubject");
+  assert(!!examMail, `[${variant}] exam mail delivered`);
+  e.readMail(examMail!.id);
+  e.answerDecision("A");
+  if (variant === "auth") run(e, "PC-PAUL", "grep horiz0n /var/log/syslog");
+  else if (variant === "scope") run(e, "WS-001", "sudo acquire PC-PAUL");
+  else {
+    run(e, "WS-001", "sudo acquire PC-PAUL");
+    const hashOut = run(e, "WS-001", `sha256sum ${TIMELINE_FILE}`).join("\n");
+    assert(hashOut.includes(EVIDENCE_HASH), "[hash] evidence hash printed");
+  }
+  e.sendChat("soc", "rapport DFIR");
+  const s = e.state.missions["e9_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "DFIR Analyst"),
+    `[${variant}] DFIR Analyst certificate`
+  );
+  assert(e.state.chapter >= 12, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[55] OLD SAVE — missing e9 runtimes still start");
+{
+  const e = completeChapter10Ready();
+  delete e.state.missions["e9_lab"];
+  delete e.state.missions["e9_scope"];
+  delete e.state.missions["e9_sim"];
+  e.startMission("e9_lab");
+  assert(e.state.activeMissionId === "e9_lab", "e9_lab starts from a save that lacked DFIR runtimes");
+  assert(Array.isArray(e.state.world.evidence), "evidence hydrated");
 }
 
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);

@@ -58,7 +58,7 @@ Ce sont des commandes **d’exploitation légitime** (admin, diag, durcissement)
 
 ## Campagne actuelle
 
-Le curriculum **jouable** aujourd’hui : chapitres **1 à 10**. La vision carrière (DFIR → architecte / GRC) est décrite plus bas ; l’Académie affiche le palier 11 en « à venir ».
+Le curriculum **jouable** aujourd’hui : chapitres **1 à 11**. La vision carrière (AppSec → architecte / GRC) est décrite plus bas ; l’Académie affiche le palier 12 en « à venir ».
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -201,6 +201,20 @@ Commandes : `sudo edr isolate PC-PAUL` ; `sudo iptables -D FW-IR-PAY` si la paie
 
 Réussir le chapitre débloque le certificat **Incident Responder**.
 
+### Chapitre 11 — DFIR (`released`)
+
+Preuve et récit **dans** HORIZON. Artefacts **texte**, pas d’image disque, pas de binaire. On raconte comment Paul est entré, ce qu’il a touché, on n’efface rien.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **La timeline de Paul** (`e9_lab`) | Lab | `sudo acquire PC-PAUL` ; `cat /opt/horizon/evidence/paul.timeline` ; wipe = `wipe_disk` |
+| **Ce qu’il a touché** (`e9_scope`) | Mission | Rayon = Paul only ; imager Marie / COMP-01 = `image_payroll` ; dump GENERAL = `leak_pii` |
+| **Simulation : DFIR** (`e9_sim`) | Simulation | Variantes `auth` / `scope` / `hash` |
+
+Commandes : `sudo acquire <hôte>` ; `cat` / `grep horiz0n` ; `sha256sum` de `paul.timeline`. Rapport sur le canal **SOC**.
+
+Réussir le chapitre débloque le certificat **DFIR Analyst**.
+
 ---
 
 ## Vision : une carrière, pas un catalogue
@@ -301,9 +315,11 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Skills :** `incident_response`, `defense_depth`. Certificat : **Incident Responder**.
 
-### Chapitre 11 — DFIR
+### Chapitre 11 — DFIR (`released`)
 
 **But :** preuve et récit. Comment est-il entré, qu’a-t-il touché, quoi extraire — artefacts **dans** HORIZON.
+
+**Objectif :** `acquire` l’hôte contenu, lire la timeline, confirmer que Marie n’est pas dans la chaîne — sans wipe ni image paie.
 
 **Skills :** `forensics`, `timeline`, `ioc`. Certificat : **DFIR Analyst**.
 
@@ -359,12 +375,12 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | **Fait** |
 | **E6** | Ch. 8 SOC L1 + app SOC branchée + timer | **Fait** |
 | **E7** | Co-op 2 joueurs (helpdesk + SOC) + vue formateur | Travail en équipe |
-| **E8** | Ch. 9–11 (L2, IR, DFIR) dans l’ordre | **9–10 faits** ; DFIR reste |
+| **E8** | Ch. 9–11 (L2, IR, DFIR) dans l’ordre | **Fait** |
 | **E9** | Ch. 11–12 (web défense, cloud HORIZON) | Ingénieur |
 | **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
 | **E11** | Ch. 14–15 GRC + capstone | Management / expert |
 
-**Prochaine implémentation :** chapitre **11 DFIR** (fin E8). Le co-op (E7) reste au plan. Pas l’atelier 5★.
+**Prochaine implémentation :** chapitre **12 AppSec** (défense web). Le co-op (E7) reste au plan. Pas l’atelier 5★.
 
 ---
 
@@ -530,13 +546,13 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | Couche | Maturité |
 | --- | --- |
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
-| Moteur + terminal | Solide pour les ch. 1–10 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier, SIEM, EDR / IOC) |
-| Contenu jouable | Chapitres 1–10 (labs + tickets + exams à variantes + atelier palier 1 + SOC L1/L2 + IR) |
-| Curriculum carrière (ch. 11–16, DFIR, atelier 5★) | Vision écrite, pas encore jouable |
-| SOC L1–L2, IR, certificats serveur, classe | File SIEM + sandbox/EDR jouables ; co-op à venir |
+| Moteur + terminal | Solide pour les ch. 1–11 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier, SIEM, EDR / IOC, DFIR) |
+| Contenu jouable | Chapitres 1–11 (labs + tickets + exams à variantes + atelier palier 1 + SOC L1/L2 + IR + DFIR) |
+| Curriculum carrière (ch. 12–16, AppSec, atelier 5★) | Vision écrite, pas encore jouable |
+| SOC L1–L2, IR, DFIR, certificats serveur, classe | File SIEM + sandbox/EDR + timeline jouables ; co-op à venir |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est un **début de carrière IT** (helpdesk → adressage → segmentation → Windows / Wi-Fi → systèmes → pfSense / MikroTik / UniFi → atelier palier 1 → **SOC L1 → SOC L2 → IR**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (DFIR, architecture 5★). La suite utile : **chapitre 11 DFIR**.
+Le prototype est un **début de carrière IT** (helpdesk → adressage → segmentation → Windows / Wi-Fi → systèmes → pfSense / MikroTik / UniFi → atelier palier 1 → **SOC L1 → SOC L2 → IR → DFIR**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (AppSec, architecture 5★). La suite utile : **chapitre 12 AppSec**.
 
 ---
 

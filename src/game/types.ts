@@ -166,6 +166,8 @@ export interface GameWorld {
   socAlerts?: SocAlert[];
   /** SOC L2 watchlist (hashes). */
   iocs?: string[];
+  /** DFIR: host ids whose text artifacts were acquired (not disk images). */
+  evidence?: string[];
 }
 
 // ---------------- Mail / Chat / Notifications ----------------

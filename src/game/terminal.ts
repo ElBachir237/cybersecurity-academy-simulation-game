@@ -45,6 +45,17 @@ import {
   SAMPLE_TEXT,
   isSamplePath,
 } from "./data/defend";
+import {
+  AUTH_PATH,
+  AUTH_TEXT,
+  EVIDENCE_DIR,
+  EVIDENCE_HASH,
+  TIMELINE_PATH,
+  TIMELINE_TEXT,
+  acquireHost,
+  isEvidencePath,
+  paulAcquired,
+} from "./data/dfir";
 
 export interface TermSignals {
   cmd: string;
@@ -261,6 +272,10 @@ function readFileInternal(path: string, host: HostRuntime, state: GameState): st
     }
     case "/opt/horizon/sandbox/sample.quarantine":
       return SAMPLE_TEXT;
+    case "/opt/horizon/evidence/paul.timeline":
+      return paulAcquired(state) ? TIMELINE_TEXT : null;
+    case "/opt/horizon/evidence/paul.auth":
+      return paulAcquired(state) ? AUTH_TEXT : null;
     case "/home/student/README.txt":
       return [
         "Bienvenue sur votre poste HORIZON.",
@@ -895,6 +910,31 @@ function cmdIoc(args: string[], state: GameState): string[] {
     return [`ioc: added ${hash}`];
   }
   return ["ioc: usage: ioc list | ioc add <sha256>"];
+}
+
+function cmdAcquire(
+  args: string[],
+  host: HostRuntime,
+  state: GameState,
+  sudo: boolean,
+  t: TFn
+): string[] {
+  if (!sudo) return [t("terminal.permissionDenied")];
+  const id = resolveEdrTarget(args[0], "", state);
+  if (!id) return ["acquire: usage: sudo acquire <host>"];
+  acquireHost(state, id);
+  if (id === "PC-PAUL") {
+    return [
+      `acquire: text artifacts for ${id}`,
+      `  ${TIMELINE_PATH}`,
+      `  ${AUTH_PATH}`,
+      "no disk image. do not acquire payroll hosts.",
+    ];
+  }
+  return [
+    `acquire: text summary for ${id} (overscope — not the contained host)`,
+    `evidence dir: ${EVIDENCE_DIR}`,
+  ];
 }
 
 function ifaceByName(host: HostRuntime, name: string): string | undefined {
@@ -1600,6 +1640,7 @@ export function execTerminal(
       out.push("  sha256sum | strings <fichier>        — sandbox (extrait texte)");
       out.push("  sudo edr status|isolate|release <hôte> — containment EDR");
       out.push("  ioc list | ioc add <hash>            — watchlist SOC");
+      out.push("  sudo acquire <hôte>                  — artefacts texte DFIR");
       out.push("  sudo nginx -t                        — tester la config nginx");
       out.push("  show vlan | show interfaces status   — ports du commutateur (SW-01)");
       out.push("  sudo switchport Gi0/14 vlan 40       — VLAN d'accès (SW-01)");
@@ -1681,9 +1722,11 @@ export function execTerminal(
       } else if (path === "/var/log") {
         out.push("syslog  auth.log  apt  dpkg.log");
       } else if (path === "/opt" || path === "/opt/horizon") {
-        out.push("sandbox");
+        out.push("sandbox  evidence");
       } else if (path === "/opt/horizon/sandbox") {
         out.push("sample.quarantine");
+      } else if (path === "/opt/horizon/evidence") {
+        out.push(paulAcquired(state) ? "paul.timeline  paul.auth" : "(empty — sudo acquire PC-PAUL)");
       } else if (path === "/etc") {
         out.push("hostname  hosts  netplan  nginx  os-release  resolv.conf");
       } else if (path === "/etc/nginx") {
@@ -1807,7 +1850,10 @@ export function execTerminal(
     case "sha256sum": {
       const file = args.find((a) => !a.startsWith("-")) ?? SAMPLE_PATH;
       if (isSamplePath(file)) out.push(`${SAMPLE_HASH}  ${SAMPLE_PATH}`);
-      else {
+      else if (isEvidencePath(file)) {
+        if (!paulAcquired(state)) out.push(`sha256sum: ${t("terminal.noSuchFile", { path: file })}`);
+        else out.push(`${EVIDENCE_HASH}  ${file.endsWith("auth") ? AUTH_PATH : TIMELINE_PATH}`);
+      } else {
         const content = readFileInternal(file, host, state);
         if (content === null) out.push(`sha256sum: ${t("terminal.noSuchFile", { path: file })}`);
         else out.push(`(sandbox) ${file}: not a quarantined sample`);
@@ -1829,6 +1875,9 @@ export function execTerminal(
       break;
     case "ioc":
       out.push(...cmdIoc(args, state));
+      break;
+    case "acquire":
+      out.push(...cmdAcquire(args, host, state, sudo, t));
       break;
     case "nginx":
       if (args[0] === "-t" || args[0] === "-t") {
