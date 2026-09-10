@@ -5,7 +5,90 @@
 // tickets and NPC moods; the engine snapshots it into saves.
 // ============================================================
 
-import type { HostRuntime } from "../types";
+import type { FwRule, GameState, HostRuntime } from "../types";
+
+export const CORE_CIDR = "10.0.0.0/24";
+export const FINANCE_CIDR = "192.168.20.0/24";
+export const OFFICE_CIDR = "192.168.10.0/24";
+export const FLOOR4_CIDR = "192.168.40.0/26";
+
+function ipToInt(ip: string): number | null {
+  const p = ip.split(".");
+  if (p.length !== 4) return null;
+  const n = p.map((o) => Number(o));
+  if (n.some((o) => !Number.isInteger(o) || o < 0 || o > 255)) return null;
+  return (((n[0] << 24) | (n[1] << 16) | (n[2] << 8) | n[3]) >>> 0);
+}
+
+export function ipInCidr(ip: string, cidr: string): boolean {
+  const [net, bitsRaw] = cidr.split("/");
+  const addr = ipToInt(ip);
+  const netInt = ipToInt(net ?? "");
+  if (addr === null || netInt === null) return false;
+  const bits = Number(bitsRaw);
+  if (!Number.isInteger(bits) || bits < 0 || bits > 32) return false;
+  const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+  return (addr & mask) === (netInt & mask);
+}
+
+function userVlan(ip: string): "10" | "20" | "30" | "40" | null {
+  if (ipInCidr(ip, OFFICE_CIDR)) return "10";
+  if (ipInCidr(ip, FINANCE_CIDR)) return "20";
+  if (ipInCidr(ip, "192.168.30.0/24")) return "30";
+  if (ipInCidr(ip, FLOOR4_CIDR)) return "40";
+  return null;
+}
+
+export function seedFwRules(): FwRule[] {
+  return [
+    {
+      id: "FW-CORE",
+      action: "allow",
+      src: "0.0.0.0/0",
+      dst: CORE_CIDR,
+      proto: "any",
+      comment: "Core services — DNS / intranet / files",
+      sticky: true,
+    },
+  ];
+}
+
+export function ruleMatches(rule: FwRule, src: string, dst: string): boolean {
+  return ipInCidr(src, rule.src) && ipInCidr(dst, rule.dst);
+}
+
+export function firewallAllows(src: string, dst: string, state: GameState): boolean {
+  const rules = state.world.fwRules ?? seedFwRules();
+  for (const rule of rules) {
+    if (rule.action === "deny" && ruleMatches(rule, src, dst)) return false;
+  }
+  for (const rule of rules) {
+    if (rule.action === "allow" && ruleMatches(rule, src, dst)) return true;
+  }
+  if (ipInCidr(dst, CORE_CIDR)) return true;
+  const a = userVlan(src);
+  const b = userVlan(dst);
+  if (a && b && a !== b) return false;
+  return true;
+}
+
+export function formatFwList(rules: FwRule[]): string[] {
+  const lines = [
+    "Chain FORWARD (policy INTER-VLAN DROP, core ALLOW)",
+  ];
+  if (!rules.length) {
+    lines.push("(no extra rules)");
+    return lines;
+  }
+  lines.push("ID        ACTION  SOURCE              DESTINATION         COMMENT");
+  for (const rule of rules) {
+    const sticky = rule.sticky ? " [policy]" : "";
+    lines.push(
+      `${rule.id.padEnd(9)} ${rule.action.padEnd(7)} ${rule.src.padEnd(19)} ${rule.dst.padEnd(19)} ${rule.comment}${sticky}`
+    );
+  }
+  return lines;
+}
 
 // ---------------- Hosts (runtime seed) ----------------
 

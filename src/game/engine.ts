@@ -18,6 +18,7 @@ import type {
   Mail,
   MissionDef,
   MissionRuntime,
+  MissionStatus,
   Notification,
   Profile,
   SaveDocument,
@@ -36,6 +37,7 @@ import {
   DNS_ZONE,
   initialChat,
   initialMails,
+  seedFwRules,
   seedHosts,
 } from "./data/world";
 import {
@@ -138,6 +140,7 @@ export function createInitialState(profile: Profile): GameState {
       dhcpRunning: true,
       financeOutage: false,
       intranetUp: true,
+      fwRules: seedFwRules(),
       tickets: [
         {
           id: "IT-1041",
@@ -155,6 +158,7 @@ export function createInitialState(profile: Profile): GameState {
         marc: { id: "marc", mood: "neutral" },
         paul: { id: "paul", mood: "neutral" },
         soriya: { id: "soriya", mood: "neutral" },
+        nour: { id: "nour", mood: "neutral" },
       },
     },
     vfs: {},
@@ -188,6 +192,73 @@ export function createInitialState(profile: Profile): GameState {
   };
 }
 
+function blankMission(id: string, status: MissionStatus): MissionRuntime {
+  return {
+    id,
+    status,
+    stepIndex: 0,
+    tasks: {},
+    decisions: {},
+    variant: "default",
+    errors: 0,
+    errorKeys: [],
+    hintsUsed: 0,
+    score: 0,
+    attempts: 0,
+  };
+}
+
+/** Additive: new missions/hosts appear on old saves without wiping progress. */
+export function hydrateProgression(state: GameState): GameState {
+  const seeded = seedHosts();
+  const hosts = { ...seeded, ...(state.world?.hosts ?? {}) };
+  for (const [id, seed] of Object.entries(seeded)) {
+    const existing = hosts[id];
+    if (!existing) {
+      hosts[id] = seed;
+      continue;
+    }
+    hosts[id] = {
+      ...seed,
+      ...existing,
+      ifaces: { ...seed.ifaces, ...existing.ifaces },
+    };
+  }
+  const missions = { ...(state.missions ?? {}) };
+  for (const id of MISSION_ORDER) {
+    if (!missions[id]) missions[id] = blankMission(id, "locked");
+  }
+  const completed = new Set(state.completedMissions ?? []);
+  for (const id of Object.keys(missions)) {
+    if (missions[id].status === "completed") completed.add(id);
+  }
+  for (const id of MISSION_ORDER) {
+    const def = MISSIONS[id];
+    const rt = missions[id];
+    if (rt.status === "locked" && def.prereq.every((p) => completed.has(p))) {
+      rt.status = "available";
+    }
+  }
+  const npc = { ...(state.world?.npc ?? {}) };
+  if (!npc.nour) npc.nour = { id: "nour", mood: "neutral" };
+  const existingRules = state.world?.fwRules;
+  let fwRules = Array.isArray(existingRules) ? existingRules : seedFwRules();
+  if (!fwRules.some((r) => r.id === "FW-CORE")) {
+    fwRules = [...seedFwRules(), ...fwRules];
+  }
+  return {
+    ...state,
+    missions,
+    completedMissions: [...completed],
+    world: {
+      ...state.world,
+      hosts,
+      npc,
+      fwRules,
+    },
+  };
+}
+
 // ---------------- Save migrations (never wipe progress) ----------------
 function migrate(doc: SaveDocument): SaveDocument {
   let state = doc.state;
@@ -207,6 +278,8 @@ function migrate(doc: SaveDocument): SaveDocument {
       version: SAVE_VERSION,
     };
   }
+  state = hydrateProgression(state);
+  state.version = SAVE_VERSION;
   return { ...doc, state, version: SAVE_VERSION };
 }
 
@@ -232,9 +305,13 @@ export class GameEngine {
   private localSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(state: GameState) {
+    const hydrated = hydrateProgression(state);
     this.state = {
-      ...state,
-      workspace: restoreWorkspace(state.workspace, Object.keys(state.world.hosts)),
+      ...hydrated,
+      workspace: restoreWorkspace(
+        hydrated.workspace,
+        Object.keys(hydrated.world.hosts)
+      ),
     };
   }
 
@@ -803,15 +880,21 @@ export class GameEngine {
   }
 
   startMission(id: string, forcedVariant?: string): void {
+    this.state = hydrateProgression(this.state);
     const def = getMission(id);
     const rt = this.state.missions[id];
-    if (!def || !rt || rt.status === "active" || rt.status === "locked") return;
+    if (!def || !rt || rt.status === "locked") return;
+    if (rt.status === "active") {
+      this.openMissionWorkspace(def);
+      return;
+    }
     rt.status = "active";
     rt.attempts += 1;
     rt.errors = 0;
     rt.errorKeys = [];
     rt.hintsUsed = 0;
     rt.score = 0;
+    rt.stepIndex = 0;
     rt.tasks = {};
     for (const step of def.steps) {
       for (const t of step.tasks ?? []) rt.tasks[t.id] = { done: false };
@@ -823,13 +906,30 @@ export class GameEngine {
     rt.startedAt = Date.now();
     this.state.activeMissionId = id;
     this.state.debrief = null;
+    this.state.learning = null;
+    this.state.pendingDecision = null;
     this.state.currentObjective = def.briefKey;
-    this.openApp("academy");
     def.onStart?.(this.fx(), this.state, rt.variant);
     this.enterStep(def, 0);
+    this.openMissionWorkspace(def);
     this.dispatch({ type: "mission-start", missionId: id });
     this.bump();
     this.save();
+  }
+
+  private openMissionWorkspace(def: MissionDef): void {
+    if (def.id === "c2_lab") {
+      this.openApp("network");
+      return;
+    }
+    if (def.kind === "lab") {
+      this.openApp("terminal");
+      return;
+    }
+    this.openApp("mail");
+    this.openApp("chat");
+    this.openApp("terminal");
+    this.focusWindow("mail");
   }
 
   private enterStep(def: MissionDef, index: number): void {
@@ -1001,7 +1101,7 @@ export class GameEngine {
     for (const m of MISSION_ORDER) {
       const mDef = MISSIONS[m];
       const mRt = this.state.missions[m];
-      if (mRt.status === "locked" && mDef.prereq.every((p) => this.state.completedMissions.includes(p))) {
+      if (mRt?.status === "locked" && mDef.prereq.every((p) => this.state.completedMissions.includes(p))) {
         mRt.status = "available";
         this.pushToast({ kind: "info", textKey: "notifyContent.missionReady" });
         audio.unlock();
@@ -1011,6 +1111,7 @@ export class GameEngine {
     // Chapter progression
     if (this.state.completedMissions.includes("c1_sim")) this.state.chapter = Math.max(this.state.chapter, 2);
     if (this.state.completedMissions.includes("c2_sim")) this.state.chapter = Math.max(this.state.chapter, 3);
+    if (this.state.completedMissions.includes("c3_sim")) this.state.chapter = Math.max(this.state.chapter, 4);
 
     this.recomputeRecommendation();
     this.state.activeMissionId = null;

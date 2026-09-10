@@ -430,6 +430,15 @@ const fr = {
     c2_plan_title: "Plan d'adressage VLAN 40",
     c2_plan_body:
       "Le 4e étage utilise le VLAN 40 : réseau 192.168.40.0/26, passerelle 192.168.40.1, 62 hôtes utiles, broadcast 192.168.40.63. Copier la config d'un autre VLAN (par ex. 192.168.10.0/24) « parce que ça ping » casse la segmentation.",
+    c3_seg_title: "Segmentation inter-VLAN",
+    c3_seg_body:
+      "Un VLAN n'isole pas tout seul : le routeur sait encore tout relayer. La segmentation réelle, c'est la politique FORWARD : qui a le droit d'atteindre Finance, et depuis quel réseau. Même sous-réseau = couche 2, pas de pare-feu. Entre VLANs, le défaut chez HORIZON est DROP.",
+    c3_fw_title: "Lire une politique FORWARD",
+    c3_fw_body:
+      "sudo iptables -L liste les règles. Une ligne ALLOW trop large (0.0.0.0/0 ou 192.168.0.0/16 vers la Finance) est un trou, pas un raccourci. On supprime l'identifiant (sudo iptables -D FW-…) ; la règle de cœur FW-CORE (DNS / intranet) est une politique, on ne la touche pas.",
+    c3_blast_title: "Rayon d'explosion d'une règle",
+    c3_blast_body:
+      "Ouvrir Finance à tout le monde « pour le prestataire » expose la comptabilité depuis n'importe quel poste, y compris un PC cloné ou un étage entier. On ferme le trou, on vérifie : ping Finance timeout, ping 10.0.0.10 toujours OK.",
   },
   missions: {
     c1_lab: {
@@ -694,6 +703,121 @@ const fr = {
       cause_gw: "passerelle 192.168.10.1, qui n'est pas on-link sur 192.168.40.0/26",
       cause_ip: "adresse 192.168.10.80, hors du réseau 192.168.40.0/26",
     },
+    c3_lab: {
+      title: "Trou dans le pare-feu",
+      kind: "Laboratoire",
+      brief:
+        "Une règle FORWARD laisse le VLAN bureaux (192.168.10.0/24) atteindre la Finance (192.168.20.0/24). Listez la politique, observez le ping vers PC-MARIE, supprimez le trou, vérifiez : Finance filtrée, DNS toujours joignable.",
+      obj1: "Fermer le trou inter-VLAN du laboratoire",
+      t1: "Lister les règles : 'sudo iptables -L'",
+      t2: "Observer le trou : depuis WS-001, 'ping 192.168.20.45'",
+      t3: "Supprimer la règle lab : 'sudo iptables -D FW-LAB'",
+      t4: "Vérifier : ping 192.168.20.45 timeout (100 % de perte)",
+      t5: "Contrôle : 'ping 10.0.0.10' répond toujours",
+      h1: "sudo iptables -L affiche FORWARD. Repérez FW-LAB.",
+      h2: "Marie est en 192.168.20.45. Le ping passe tant que FW-LAB existe.",
+      h3: "On supprime par identifiant, pas au hasard. FW-CORE est une politique : intouchable.",
+      h4: "Un DROP est silencieux : pas de Destination Unreachable, juste de la perte.",
+      h5: "Le cœur (10.0.0.0/24) reste autorisé. Le DNS ne doit pas casser.",
+      method:
+        "Lister → observer le trafic qui ne devrait pas passer → supprimer uniquement la règle trop large → vérifier échec Finance et succès DNS.",
+      next: "Un vrai ticket : un prestataire a ouvert 192.168.0.0/16 vers la Finance.",
+    },
+    c3_mission: {
+      title: "Le raccourci du prestataire",
+      kind: "Mission",
+      brief:
+        "Un prestataire a ajouté ALLOW 192.168.0.0/16 → 192.168.20.0/24 « pour dépanner ». Toute la plage privée atteint la comptabilité. Lisez le ticket, listez FORWARD, retirez le trou, vérifiez, confirmez. N'ouvrez pas 0.0.0.0/0.",
+      obj1: "Lire le ticket IT-3101",
+      obj2: "Refermer l'accès inter-VLAN vers la Finance",
+      t1: "Lire le mail IT-3101 et le chat IT-SUPPORT",
+      t2: "Lister la politique : 'sudo iptables -L'",
+      t3: "Supprimer le trou : 'sudo iptables -D FW-VENDOR' (et FW-ANY si vous l'avez créée)",
+      t4: "Constater : plus aucune règle extra vers 192.168.20.0/24",
+      t5: "Vérifier : ping 192.168.20.45 timeout, ping 10.0.0.10 OK",
+      t6: "Confirmer dans IT-SUPPORT",
+      h1: "Le mail décrit le /16. Répondez aussi dans le chat.",
+      h2: "FW-VENDOR est la ligne trop large. FW-CORE doit rester.",
+      h3: "sudo iptables -D FW-VENDOR. Si Marc vous a fait ajouter FW-ANY, supprimez-la aussi.",
+      h4: "sudo iptables -L : plus de trou vers la Finance.",
+      h5: "Depuis WS-001 : ping Marie échoue, ping DNS réussit.",
+      h6: "Un court message dans IT-SUPPORT suffit.",
+      callContext: "Lena appelle : le SOC voit du trafic bureaux → Finance qui n'a rien à faire là.",
+      callQuestion: "Que lui répondez-vous ?",
+      callA: "Je liste FORWARD et je retire la règle trop large, sans en ouvrir une autre.",
+      callB: "J'ajoute ALLOW any vers Finance, au moins le prestataire arrêtera de relancer.",
+      callC: "Si Marie ping encore, on ne touche à rien.",
+      callConsequenceA: "Bonne méthode : on lit la politique, on retire le trou, on ne « corrige » pas en ouvrant plus grand.",
+      callConsequenceB: "0.0.0.0/0 vers la comptabilité, c'est le rayon d'explosion maximal.",
+      callConsequenceC: "Un ping qui passe n'a jamais prouvé qu'une règle était légitime.",
+      decisionContext:
+        "Marc écrit : « Le prestataire râle. Mets 0.0.0.0/0 vers Finance, on fera le ménage lundi. »",
+      decisionQuestion: "Que faites-vous ?",
+      decA: "Ajouter ALLOW 0.0.0.0/0 vers la Finance",
+      decB: "Supprimer le trou /16, sans règle de remplacement large",
+      decC: "Laisser FW-VENDOR, le prestataire en a besoin",
+      decConsequenceA:
+        "Soriya ouvre IT-3102 : Finance est joignable depuis n'importe où. Une règle « temporaire » est déjà un incident.",
+      decConsequenceB:
+        "Choix correct : on ferme le trou. Un besoin prestataire se traite par une règle étroite, pas par any.",
+      decConsequenceC:
+        "192.168.0.0/16 englobe bureaux, logistique, étage 4. Ce n'est pas un accès prestataire, c'est une autoroute.",
+      learningTitle: "Any n'est pas un dépannage",
+      learningImpact:
+        "0.0.0.0/0 → Finance : chaque VLAN, et au-delà, atteint la comptabilité. Le SOC voit un blast radius immédiat.",
+      learningWhy:
+        "Une règle trop ouverte n'est pas un raccourci opérationnel. C'est un trou. On retire, on ne compense pas par plus large.",
+      learningCheck:
+        "sudo iptables -L : aucune ALLOW extra vers 192.168.20.0/24. Ping Marie timeout, ping 10.0.0.10 OK.",
+      learningTitleLeave: "Un /16 n'est pas « le prestataire »",
+      learningImpactLeave:
+        "Tout 192.168.x.x atteint Finance : PC-NOUR, logistique, bureaux. La segmentation VLAN 20 n'existe plus.",
+      learningWhyLeave:
+        "Le besoin d'un prestataire se décrit par une source étroite. 192.168.0.0/16 est tout le campus privé.",
+      learningCheckLeave: "Supprimer FW-VENDOR, revérifier iptables -L et les pings.",
+      method:
+        "Lire le ticket → lister FORWARD → identifier la source trop large → supprimer → vérifier échec Finance et succès cœur → confirmer.",
+      next: "La simulation rejoue trois trous : any, mauvaise source, /16. Seul, sans indices.",
+      mailTicketSubject: "IT-3101 : Trou FORWARD vers la Finance",
+      mailTicketBody:
+        "Prestataire : règle ALLOW 192.168.0.0/16 → 192.168.20.0/24 ajoutée « en attendant ». Politique HORIZON : inter-VLAN DROP, cœur 10.0.0.0/24 autorisé. Retirer le trou. Ne pas compenser par 0.0.0.0/0. Vérifier depuis WS-001 : ping 192.168.20.45 échoue, ping 10.0.0.10 réussit.",
+      chatLena1: "Le SOC voit du 192.168.10 et du 192.168.40 vers Marie. Ce n'est pas normal.",
+      chatLena2: "Politique rétablie. Merci d'avoir fermé le trou sans en ouvrir un plus grand.",
+      chatMarc1: "Le prestataire dit que sans le /16 il ne peut plus « bosser ». Ouvre any, on verra lundi.",
+      reportSubject: "RAPPORT D'INTERVENTION — Ticket IT-3101 (FORWARD / Finance)",
+    },
+    c3_sim: {
+      title: "Simulation : segmentation",
+      kind: "Simulation — Examen du chapitre",
+      brief:
+        "Le SOC signale un accès anormal vers la Finance. Aucun indice. Listez FORWARD, identifiez le trou, retirez-le, vérifiez ping Finance (timeout) et ping DNS (OK), rapportez. L'attestation Network Sentinel en dépend.",
+      obj1: "Refermer la Finance sans casser le cœur",
+      t1: "Prendre connaissance de l'incident (mail + chat)",
+      t2: "Diagnostiquer : 'sudo iptables -L' et pings de contrôle",
+      t3: "Supprimer la règle trop large (FW-HOLE)",
+      t4: "Vérifier : ping Finance timeout, ping 10.0.0.10 OK",
+      t5: "Rédiger le rapport dans IT-SUPPORT",
+      callContext: "Soriya : « On a du trafic vers 192.168.20 qui ne devrait pas exister. Ne me dites pas que vous allez ouvrir plus grand. »",
+      callQuestion: "Votre réponse :",
+      callA: "Je lis FORWARD, je retire uniquement le trou, je vérifie DNS et Finance.",
+      callB: "J'ajoute 0.0.0.0/0 le temps de comprendre.",
+      callC: "Je coupe aussi FW-CORE, au moins plus rien ne passe.",
+      callConsequenceA: "Méthode d'examen : lire, retirer le trop large, vérifier les deux côtés.",
+      callConsequenceB: "Ouvrir any pendant un examen, c'est aggraver l'incident.",
+      callConsequenceC: "FW-CORE est la politique cœur (DNS / intranet). La couper crée une panne pour tout le siège.",
+      reportSubject: "Rapport d'incident — {host}",
+      method:
+        "Comparer la politique au besoin : pas d'ALLOW extra vers Finance, FW-CORE intact, ping 10.0.0.10 OK, ping 192.168.20.45 timeout.",
+      next: "Chapitre 3 validé. La segmentation tient : on ferme un trou, on ne l'élargit pas.",
+      mailSubject: "INC-3108 : accès anormal vers VLAN Finance",
+      mailBody:
+        "Trafic inattendu vers 192.168.20.0/24. Politique : inter-VLAN DROP, cœur 10.0.0.0/24 ALLOW. Identifiez et retirez la règle trop large. Ne pas toucher FW-CORE. Vérifiez depuis le poste source.",
+      chatSoriya1: "Finance ne devrait pas répondre aux autres VLAN. Vous pouvez confirmer FORWARD ?",
+      chatSoriya2: "Trou fermé, DNS intact. Je clos l'alerte.",
+      cause_any: "ALLOW 0.0.0.0/0 vers la Finance — rayon d'explosion maximal",
+      cause_src: "ALLOW VLAN 40 → Finance — mauvaise source, l'étage 4 n'a pas ce besoin",
+      cause_wide: "ALLOW 192.168.0.0/16 vers la Finance — tout le campus privé",
+    },
   },
   npc: {
     lena: "Lena Kovac",
@@ -737,6 +861,7 @@ const fr = {
     socAlert: "Le SOC a enregistré une activité inhabituelle",
     simReady: "Simulation du chapitre débloquée",
     chapter2: "Chapitre 2 disponible dans l'Académie",
+    chapter3: "Chapitre 3 disponible dans l'Académie",
   },
   intro: {
     day: "LUNDI — JOUR 1",
@@ -773,6 +898,10 @@ const fr = {
   chapter2: {
     title: "Fondamentaux Réseau",
     sub: "IPv4, CIDR, DNS, DHCP, routage — par la pratique",
+  },
+  chapter3: {
+    title: "Sécurité réseau",
+    sub: "Pare-feu, segmentation, rayon d'explosion — par la pratique",
   },
 };
 
@@ -1199,6 +1328,15 @@ const en: Dict = {
     c2_plan_title: "VLAN 40 addressing plan",
     c2_plan_body:
       "Floor 4 uses VLAN 40: network 192.168.40.0/26, gateway 192.168.40.1, 62 usable hosts, broadcast 192.168.40.63. Copying another VLAN's config (e.g. 192.168.10.0/24) 'because it pings' breaks segmentation.",
+    c3_seg_title: "Inter-VLAN segmentation",
+    c3_seg_body:
+      "A VLAN alone does not isolate: the router can still forward everything. Real segmentation is the FORWARD policy: who may reach Finance, and from which network. Same subnet = layer 2, no firewall. Between VLANs, HORIZON's default is DROP.",
+    c3_fw_title: "Reading a FORWARD policy",
+    c3_fw_body:
+      "sudo iptables -L lists the rules. An ALLOW that is too wide (0.0.0.0/0 or 192.168.0.0/16 to Finance) is a hole, not a shortcut. Delete by id (sudo iptables -D FW-…); the core rule FW-CORE (DNS / intranet) is policy — leave it.",
+    c3_blast_title: "Blast radius of a rule",
+    c3_blast_body:
+      "Opening Finance to everyone 'for the vendor' exposes accounting from any host, including a cloned PC or a whole floor. Close the hole, then verify: ping Finance times out, ping 10.0.0.10 still works.",
   },
   missions: {
     c1_lab: {
@@ -1459,6 +1597,121 @@ const en: Dict = {
       cause_gw: "gateway 192.168.10.1, which is not on-link on 192.168.40.0/26",
       cause_ip: "address 192.168.10.80, outside network 192.168.40.0/26",
     },
+    c3_lab: {
+      title: "Hole in the firewall",
+      kind: "Lab",
+      brief:
+        "A FORWARD rule lets the office VLAN (192.168.10.0/24) reach Finance (192.168.20.0/24). List the policy, observe the ping to PC-MARIE, delete the hole, verify: Finance filtered, DNS still reachable.",
+      obj1: "Close the lab inter-VLAN hole",
+      t1: "List the rules: 'sudo iptables -L'",
+      t2: "Observe the hole: from WS-001, 'ping 192.168.20.45'",
+      t3: "Delete the lab rule: 'sudo iptables -D FW-LAB'",
+      t4: "Verify: ping 192.168.20.45 times out (100% loss)",
+      t5: "Control: 'ping 10.0.0.10' still replies",
+      h1: "sudo iptables -L shows FORWARD. Spot FW-LAB.",
+      h2: "Marie is at 192.168.20.45. The ping works while FW-LAB exists.",
+      h3: "Delete by id, not at random. FW-CORE is policy: do not touch it.",
+      h4: "A DROP is silent: no Destination Unreachable, just loss.",
+      h5: "Core (10.0.0.0/24) stays allowed. DNS must not break.",
+      method:
+        "List → observe traffic that should not pass → delete only the overly wide rule → verify Finance failure and DNS success.",
+      next: "A real ticket: a vendor opened 192.168.0.0/16 to Finance.",
+    },
+    c3_mission: {
+      title: "The vendor shortcut",
+      kind: "Mission",
+      brief:
+        "A vendor added ALLOW 192.168.0.0/16 → 192.168.20.0/24 'as a workaround'. The whole private range can reach accounting. Read the ticket, list FORWARD, remove the hole, verify, confirm. Do not open 0.0.0.0/0.",
+      obj1: "Read ticket IT-3101",
+      obj2: "Close inter-VLAN access to Finance",
+      t1: "Read mail IT-3101 and the IT-SUPPORT chat",
+      t2: "List the policy: 'sudo iptables -L'",
+      t3: "Delete the hole: 'sudo iptables -D FW-VENDOR' (and FW-ANY if you created it)",
+      t4: "Confirm: no extra rule toward 192.168.20.0/24",
+      t5: "Verify: ping 192.168.20.45 times out, ping 10.0.0.10 OK",
+      t6: "Confirm in IT-SUPPORT",
+      h1: "The mail describes the /16. Reply in chat too.",
+      h2: "FW-VENDOR is the overly wide line. FW-CORE must stay.",
+      h3: "sudo iptables -D FW-VENDOR. If Marc made you add FW-ANY, delete that too.",
+      h4: "sudo iptables -L: no remaining hole to Finance.",
+      h5: "From WS-001: ping Marie fails, ping DNS succeeds.",
+      h6: "A short message in IT-SUPPORT is enough.",
+      callContext: "Lena calls: SOC sees office → Finance traffic that should not exist.",
+      callQuestion: "What do you tell her?",
+      callA: "I'll list FORWARD and remove the overly wide rule, without opening another.",
+      callB: "I'll add ALLOW any to Finance so the vendor stops chasing us.",
+      callC: "If Marie still pings, we leave it.",
+      callConsequenceA: "Right method: read the policy, remove the hole, don't 'fix' it by opening wider.",
+      callConsequenceB: "0.0.0.0/0 to accounting is maximum blast radius.",
+      callConsequenceC: "A successful ping never proved a rule was legitimate.",
+      decisionContext:
+        "Marc writes: 'The vendor is complaining. Put 0.0.0.0/0 to Finance, we'll clean up on Monday.'",
+      decisionQuestion: "What do you do?",
+      decA: "Add ALLOW 0.0.0.0/0 to Finance",
+      decB: "Delete the /16 hole, with no wide replacement",
+      decC: "Leave FW-VENDOR, the vendor needs it",
+      decConsequenceA:
+        "Soriya opens IT-3102: Finance is reachable from anywhere. A 'temporary' rule is already an incident.",
+      decConsequenceB:
+        "Correct: close the hole. A vendor need is a narrow rule, not any.",
+      decConsequenceC:
+        "192.168.0.0/16 covers office, logistics, floor 4. That is not vendor access, it is a highway.",
+      learningTitle: "Any is not troubleshooting",
+      learningImpact:
+        "0.0.0.0/0 → Finance: every VLAN, and beyond, reaches accounting. SOC sees an immediate blast radius.",
+      learningWhy:
+        "An overly open rule is not an operational shortcut. It is a hole. Remove it; do not compensate with a wider one.",
+      learningCheck:
+        "sudo iptables -L: no extra ALLOW to 192.168.20.0/24. Ping Marie times out, ping 10.0.0.10 OK.",
+      learningTitleLeave: "A /16 is not 'the vendor'",
+      learningImpactLeave:
+        "All of 192.168.x.x reaches Finance: PC-NOUR, logistics, office. VLAN 20 segmentation is gone.",
+      learningWhyLeave:
+        "A vendor need is a narrow source. 192.168.0.0/16 is the whole private campus.",
+      learningCheckLeave: "Delete FW-VENDOR, re-check iptables -L and the pings.",
+      method:
+        "Read the ticket → list FORWARD → spot the overly wide source → delete → verify Finance failure and core success → confirm.",
+      next: "The simulation replays three holes: any, wrong source, /16. Solo, no hints.",
+      mailTicketSubject: "IT-3101: FORWARD hole toward Finance",
+      mailTicketBody:
+        "Vendor: ALLOW 192.168.0.0/16 → 192.168.20.0/24 added 'for now'. HORIZON policy: inter-VLAN DROP, core 10.0.0.0/24 allowed. Remove the hole. Do not compensate with 0.0.0.0/0. Verify from WS-001: ping 192.168.20.45 fails, ping 10.0.0.10 succeeds.",
+      chatLena1: "SOC sees 192.168.10 and 192.168.40 toward Marie. That is not normal.",
+      chatLena2: "Policy restored. Thanks for closing the hole without opening a wider one.",
+      chatMarc1: "The vendor says without the /16 they can't 'work'. Open any, we'll see Monday.",
+      reportSubject: "INTERVENTION REPORT — Ticket IT-3101 (FORWARD / Finance)",
+    },
+    c3_sim: {
+      title: "Simulation: segmentation",
+      kind: "Simulation — Chapter exam",
+      brief:
+        "SOC reports abnormal access to Finance. No hints. List FORWARD, identify the hole, remove it, verify ping Finance (timeout) and ping DNS (OK), report. The Network Sentinel certificate depends on it.",
+      obj1: "Re-close Finance without breaking core",
+      t1: "Read the incident (mail + chat)",
+      t2: "Diagnose: 'sudo iptables -L' and control pings",
+      t3: "Delete the overly wide rule (FW-HOLE)",
+      t4: "Verify: ping Finance times out, ping 10.0.0.10 OK",
+      t5: "Write the report in IT-SUPPORT",
+      callContext: "Soriya: 'We have traffic to 192.168.20 that should not exist. Don't tell me you're going to open it wider.'",
+      callQuestion: "Your answer:",
+      callA: "I'll read FORWARD, remove only the hole, then verify DNS and Finance.",
+      callB: "I'll add 0.0.0.0/0 while I figure it out.",
+      callC: "I'll drop FW-CORE too, at least nothing else gets through.",
+      callConsequenceA: "Exam method: read, remove the overly wide rule, verify both sides.",
+      callConsequenceB: "Opening any during an exam makes the incident worse.",
+      callConsequenceC: "FW-CORE is core policy (DNS / intranet). Removing it outages the whole HQ.",
+      reportSubject: "Incident report — {host}",
+      method:
+        "Compare policy to need: no extra ALLOW to Finance, FW-CORE intact, ping 10.0.0.10 OK, ping 192.168.20.45 times out.",
+      next: "Chapter 3 validated. Segmentation holds: you close a hole, you do not widen it.",
+      mailSubject: "INC-3108: abnormal access to Finance VLAN",
+      mailBody:
+        "Unexpected traffic toward 192.168.20.0/24. Policy: inter-VLAN DROP, core 10.0.0.0/24 ALLOW. Identify and remove the overly wide rule. Do not touch FW-CORE. Verify from the source host.",
+      chatSoriya1: "Finance should not answer other VLANs. Can you confirm FORWARD?",
+      chatSoriya2: "Hole closed, DNS intact. I'm closing the alert.",
+      cause_any: "ALLOW 0.0.0.0/0 to Finance — maximum blast radius",
+      cause_src: "ALLOW VLAN 40 → Finance — wrong source, floor 4 has no such need",
+      cause_wide: "ALLOW 192.168.0.0/16 to Finance — the whole private campus",
+    },
   },
   npc: {
     lena: "Lena Kovac",
@@ -1502,6 +1755,7 @@ const en: Dict = {
     socAlert: "The SOC recorded unusual activity",
     simReady: "Chapter simulation unlocked",
     chapter2: "Chapter 2 available in the Academy",
+    chapter3: "Chapter 3 available in the Academy",
   },
   intro: {
     day: "MONDAY — DAY 1",
@@ -1537,6 +1791,10 @@ const en: Dict = {
   chapter2: {
     title: "Network Foundations",
     sub: "IPv4, CIDR, DNS, DHCP, routing — by practice",
+  },
+  chapter3: {
+    title: "Network Security",
+    sub: "Firewall, segmentation, blast radius — by practice",
   },
 };
 

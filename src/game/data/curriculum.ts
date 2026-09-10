@@ -129,7 +129,14 @@ export const CHAPTERS: ChapterDef[] = [
     theoryKeys: ["c2_ip", "c2_subnet", "c2_plan"],
     missionIds: ["c2_lab", "c2_mission", "c2_sim"],
   },
-  { id: 3, titleKey: "Network Security", status: "soon", theoryKeys: [], missionIds: [] },
+  {
+    id: 3,
+    titleKey: "chapter3",
+    subKey: "chapter3",
+    status: "released",
+    theoryKeys: ["c3_seg", "c3_fw", "c3_blast"],
+    missionIds: ["c3_lab", "c3_mission", "c3_sim"],
+  },
   { id: 4, titleKey: "SOC Operations", status: "soon", theoryKeys: [], missionIds: [] },
   { id: 5, titleKey: "Incident Response", status: "soon", theoryKeys: [], missionIds: [] },
   { id: 6, titleKey: "Web Security", status: "soon", theoryKeys: [], missionIds: [] },
@@ -200,6 +207,13 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 2",
     missionIds: ["c2_lab", "c2_mission", "c2_sim"],
     skills: ["ipv4", "subnetting", "routing", "network_diag"],
+  },
+  {
+    id: "net_sentinel",
+    titleKey: "Network Sentinel",
+    level: "Chapter 3",
+    missionIds: ["c3_lab", "c3_mission", "c3_sim"],
+    skills: ["firewall", "vlan", "seg_arch", "defense_depth"],
   },
 ];
 

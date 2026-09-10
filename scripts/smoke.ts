@@ -13,6 +13,10 @@ function noLoss(out: string): boolean {
   return out.includes("0% de perte") || out.includes("0% packet loss");
 }
 
+function allLoss(out: string): boolean {
+  return out.includes("100%") && (out.includes("perte") || out.includes("packet loss"));
+}
+
 let failures = 0;
 function assert(cond: boolean, msg: string) {
   if (cond) {
@@ -247,6 +251,11 @@ function nourNetplan(ip = "192.168.40.24", cidr = 26, gw = "192.168.40.1"): stri
   ].join("\n");
 }
 
+function fixNourPlan(e: GameEngine) {
+  e.writeFile("PC-NOUR", "/etc/netplan/01-netcfg.yaml", nourNetplan());
+  run(e, "PC-NOUR", "sudo netplan apply");
+}
+
 function completeChapter1(e: GameEngine) {
   e.startMission("c1_lab");
   run(e, "WS-001", "help");
@@ -279,9 +288,43 @@ function completeChapter1(e: GameEngine) {
   e.sendChat("itsupport", "rapport: incident résolu");
 }
 
-function fixNourPlan(e: GameEngine) {
-  e.writeFile("PC-NOUR", "/etc/netplan/01-netcfg.yaml", nourNetplan());
-  run(e, "PC-NOUR", "sudo netplan apply");
+function completeChapter2(e: GameEngine) {
+  completeChapter1(e);
+  e.startMission("c2_lab");
+  e.openApp("network");
+  e.dispatchAction("subnet-calc", {
+    count: 1,
+    ip: "192.168.40.0",
+    cidr: 26,
+    network: "192.168.40.0",
+    usable: 62,
+  });
+  e.startMission("c2_mission");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c2_mission.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "PC-NOUR", "ip addr");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  e.openApp("network");
+  fixNourPlan(e);
+  run(e, "PC-NOUR", "ping 192.168.40.1");
+  run(e, "PC-NOUR", "ping 10.0.0.10");
+  e.sendChat("itsupport", "VLAN 40 ok");
+  e.startMission("c2_sim", "mask");
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c2_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  run(e, "PC-NOUR", "ip addr");
+  fixNourPlan(e);
+  run(e, "PC-NOUR", "ping 192.168.40.1");
+  run(e, "PC-NOUR", "ping 10.0.0.10");
+  e.sendChat("itsupport", "rapport: plan VLAN 40 rétabli");
+}
+
+function completeChapter2Ready(): GameEngine {
+  const e = newEngine();
+  completeChapter2(e);
+  return e;
 }
 
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
@@ -310,10 +353,19 @@ console.log("\n[7] CHAPTER 2 MISSION c2_mission");
   e.openApp("network");
   e.dispatchAction("subnet-calc", { count: 1, ip: "192.168.40.0", cidr: 26, network: "192.168.40.0", usable: 62 });
   e.startMission("c2_mission");
+  assert(e.state.activeMissionId === "c2_mission", "c2_mission started");
+  assert(
+    e.state.mails.some((m) => m.subjectKey === "missions.c2_mission.mailTicketSubject"),
+    "IT-2101 mail is in the inbox"
+  );
+  assert(e.state.activeWindow === "mail", "mail app opens so the ticket is visible");
   assert(e.state.world.hosts["PC-NOUR"]?.ifaces.eth0?.ip === "192.168.10.80", "Nour starts on cloned VLAN 10 address");
   assert(e.state.world.hosts["RTR-HQ"]?.ifaces.eth4?.ip === "192.168.40.1", "VLAN 40 gateway exists on RTR-HQ");
+  assert(e.state.pendingDecision === null, "phone call waits until the mail is read");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c2_mission.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  assert(e.state.pendingDecision?.id === "c2m_call", "Nour calls after the ticket is read");
   e.answerDecision("A");
-  e.sendChat("itsupport", "je prends IT-2101");
   run(e, "PC-NOUR", "ip addr");
   if (e.state.pendingDecision) e.answerDecision("B");
   e.openApp("network");
@@ -339,8 +391,9 @@ console.log("\n[8] CHAPTER 2 ERROR — leave Nour on VLAN 10");
   e.openApp("network");
   e.dispatchAction("subnet-calc", { count: 1, ip: "192.168.40.0", cidr: 26, network: "192.168.40.0", usable: 62 });
   e.startMission("c2_mission");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c2_mission.mailTicketSubject")!;
+  e.readMail(ticket.id);
   e.answerDecision("A");
-  e.sendChat("itsupport", "vu");
   run(e, "PC-NOUR", "ip addr");
   assert(e.state.pendingDecision?.id === "c2m_leave", "segmentation decision shown");
   e.answerDecision("A");
@@ -364,8 +417,9 @@ for (const variant of ["mask", "gw", "ip"] as const) {
   e.openApp("network");
   e.dispatchAction("subnet-calc", { count: 1, ip: "192.168.40.0", cidr: 26, network: "192.168.40.0", usable: 62 });
   e.startMission("c2_mission");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c2_mission.mailTicketSubject")!;
+  e.readMail(ticket.id);
   e.answerDecision("A");
-  e.sendChat("itsupport", "vu");
   run(e, "PC-NOUR", "ip addr");
   if (e.state.pendingDecision) e.answerDecision("B");
   e.openApp("network");
@@ -376,8 +430,13 @@ for (const variant of ["mask", "gw", "ip"] as const) {
 
   e.startMission("c2_sim", variant);
   assert(e.state.missions["c2_sim"].variant === variant, `variant is ${variant}`);
+  assert(
+    e.state.mails.some((m) => m.subjectKey === "missions.c2_sim.mailSubject"),
+    `[${variant}] exam mail is in the inbox`
+  );
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c2_sim.mailSubject")!;
+  e.readMail(examMail.id);
   e.answerDecision("A");
-  e.sendChat("itsupport", "je diagnostique");
   run(e, "PC-NOUR", "ip addr");
   run(e, "PC-NOUR", "ip route");
   run(e, "PC-NOUR", "cat /etc/netplan/01-netcfg.yaml");
@@ -394,6 +453,192 @@ for (const variant of ["mask", "gw", "ip"] as const) {
   );
   assert(e.state.debrief !== null, `[${variant}] debrief available`);
   assert(e.state.chapter >= 3, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[10] OLD SAVE — missing c2_mission runtime still starts and gets mail");
+{
+  const e = newEngine();
+  completeChapter1(e);
+  e.startMission("c2_lab");
+  e.openApp("network");
+  e.dispatchAction("subnet-calc", { count: 1, ip: "192.168.40.0", cidr: 26, network: "192.168.40.0", usable: 62 });
+  delete e.state.missions["c2_mission"];
+  delete e.state.missions["c2_sim"];
+  e.startMission("c2_mission");
+  assert(e.state.activeMissionId === "c2_mission", "hydrated runtime starts");
+  assert(
+    e.state.mails.some((m) => m.subjectKey === "missions.c2_mission.mailTicketSubject"),
+    "ticket mail created on hydrated start"
+  );
+  assert(e.state.activeWindow === "mail", "mail workspace opened");
+}
+
+console.log("\n[11] CHAPTER 1 still reaches DNS after firewall default");
+{
+  const e = newEngine();
+  const dns = run(e, "WS-001", "ping 10.0.0.10").join("\n");
+  assert(noLoss(dns), "office to DNS allowed by FW-CORE");
+  const finance = run(e, "WS-001", "ping 192.168.20.45").join("\n");
+  assert(allLoss(finance), "office to Finance denied by default");
+}
+
+console.log("\n[12] CHAPTER 3 LAB c3_lab");
+{
+  const e = completeChapter2Ready();
+  assert(e.state.missions["c3_lab"].status === "available", "c3_lab unlocked after chapter 2");
+  e.startMission("c3_lab");
+  assert(e.state.activeMissionId === "c3_lab", "c3_lab started");
+  assert(e.state.activeWindow === "terminal", "lab opens the terminal, not mail");
+  assert(
+    e.state.world.fwRules.some((r) => r.id === "FW-LAB"),
+    "lab hole FW-LAB is present"
+  );
+  const listed = run(e, "WS-001", "sudo iptables -L").join("\n");
+  assert(listed.includes("FW-LAB"), "iptables -L shows FW-LAB");
+  const holePing = run(e, "WS-001", "ping 192.168.20.45").join("\n");
+  assert(noLoss(holePing), "hole lets office ping Marie");
+  const del = run(e, "WS-001", "sudo iptables -D FW-LAB").join("\n");
+  assert(del.includes("deleted"), "FW-LAB deleted");
+  const closed = run(e, "WS-001", "ping 192.168.20.45").join("\n");
+  assert(allLoss(closed), "Finance ping times out after delete");
+  const dns = run(e, "WS-001", "ping 10.0.0.10").join("\n");
+  assert(noLoss(dns), "DNS still reachable");
+  assert(e.state.missions["c3_lab"].status === "completed", `c3_lab completed (status=${e.state.missions["c3_lab"].status})`);
+  assert(e.state.missions["c3_mission"].status === "available", "c3_mission unlocked");
+}
+
+console.log("\n[13] CHAPTER 3 MISSION c3_mission");
+{
+  const e = completeChapter2Ready();
+  e.startMission("c3_lab");
+  run(e, "WS-001", "sudo iptables -L");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "sudo iptables -D FW-LAB");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+  e.startMission("c3_mission");
+  assert(e.state.activeMissionId === "c3_mission", "c3_mission started");
+  assert(
+    e.state.mails.some((m) => m.subjectKey === "missions.c3_mission.mailTicketSubject"),
+    "IT-3101 mail is in the inbox"
+  );
+  assert(e.state.activeWindow === "mail", "mail app opens so the ticket is visible");
+  assert(e.state.pendingDecision === null, "phone call waits until the mail is read");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c3_mission.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  assert(e.state.pendingDecision?.id === "c3m_call", "Lena calls after the ticket is read");
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo iptables -L");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo iptables -D FW-VENDOR");
+  const closed = run(e, "WS-001", "ping 192.168.20.45").join("\n");
+  assert(allLoss(closed), "Finance closed after vendor hole removed");
+  run(e, "WS-001", "ping 10.0.0.10");
+  e.sendChat("itsupport", "trou FW-VENDOR fermé, DNS OK");
+  assert(e.state.missions["c3_mission"].status === "completed", `c3_mission completed (status=${e.state.missions["c3_mission"].status})`);
+  assert(e.state.missions["c3_sim"].status === "available", "c3_sim unlocked");
+}
+
+console.log("\n[14] CHAPTER 3 ERROR — open any to Finance");
+{
+  const e = completeChapter2Ready();
+  e.startMission("c3_lab");
+  run(e, "WS-001", "sudo iptables -L");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "sudo iptables -D FW-LAB");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+  e.startMission("c3_mission");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c3_mission.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo iptables -L");
+  assert(e.state.pendingDecision?.id === "c3m_marc", "Marc decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["c3_mission"].errorKeys.includes("opened_any"), "error recorded");
+  assert(e.state.world.tickets.some((t) => t.id === "IT-3102"), "IT-3102 opened");
+  assert(e.state.world.fwRules.some((r) => r.id === "FW-ANY"), "FW-ANY was added");
+  run(e, "WS-001", "sudo iptables -D FW-VENDOR");
+  run(e, "WS-001", "sudo iptables -D FW-ANY");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+  e.sendChat("itsupport", "corrigé malgré tout");
+  assert(e.state.missions["c3_mission"].status === "completed", "mission still completable");
+  assert(e.state.missions["c3_mission"].score < 100, "score penalized");
+}
+
+for (const variant of ["any", "src", "wide"] as const) {
+  console.log(`\n[15] SIM c3_sim variant=${variant}`);
+  const e = completeChapter2Ready();
+  e.startMission("c3_lab");
+  run(e, "WS-001", "sudo iptables -L");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "sudo iptables -D FW-LAB");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+  e.startMission("c3_mission");
+  const ticket = e.state.mails.find((m) => m.subjectKey === "missions.c3_mission.mailTicketSubject")!;
+  e.readMail(ticket.id);
+  e.answerDecision("A");
+  run(e, "WS-001", "sudo iptables -L");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  run(e, "WS-001", "sudo iptables -D FW-VENDOR");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+  e.sendChat("itsupport", "FORWARD ok");
+
+  e.startMission("c3_sim", variant);
+  assert(e.state.missions["c3_sim"].variant === variant, `variant is ${variant}`);
+  assert(
+    e.state.mails.some((m) => m.subjectKey === "missions.c3_sim.mailSubject"),
+    `[${variant}] exam mail is in the inbox`
+  );
+  assert(e.state.activeWindow === "mail", `[${variant}] mail workspace opened`);
+  assert(e.state.pendingDecision === null, `[${variant}] call waits for mail-read`);
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.c3_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  const listed = run(e, "WS-001", "sudo iptables -L").join("\n");
+  assert(listed.includes("FW-HOLE"), `[${variant}] FW-HOLE listed`);
+  const probe = variant === "src" ? "PC-NOUR" : "WS-001";
+  const before = run(e, probe, "ping 192.168.20.45").join("\n");
+  assert(noLoss(before), `[${variant}] hole visible from ${probe}`);
+  run(e, "WS-001", "sudo iptables -D FW-HOLE");
+  const after = run(e, probe, "ping 192.168.20.45").join("\n");
+  assert(allLoss(after), `[${variant}] Finance closed`);
+  const dns = run(e, "WS-001", "ping 10.0.0.10").join("\n");
+  assert(noLoss(dns), `[${variant}] DNS still up`);
+  e.sendChat("itsupport", "rapport: trou FORWARD fermé");
+  const s = e.state.missions["c3_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed (status=${s.status})`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "Network Sentinel"),
+    `[${variant}] Network Sentinel certificate`
+  );
+  assert(e.state.badges.includes("firewall_architect"), `[${variant}] badge firewall_architect`);
+  assert(e.state.debrief !== null, `[${variant}] debrief available`);
+  assert(e.state.chapter >= 4, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[16] OLD SAVE — missing c3_mission runtime still starts and gets mail");
+{
+  const e = completeChapter2Ready();
+  e.startMission("c3_lab");
+  run(e, "WS-001", "sudo iptables -L");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "sudo iptables -D FW-LAB");
+  run(e, "WS-001", "ping 192.168.20.45");
+  run(e, "WS-001", "ping 10.0.0.10");
+  delete e.state.missions["c3_mission"];
+  delete e.state.missions["c3_sim"];
+  e.startMission("c3_mission");
+  assert(e.state.activeMissionId === "c3_mission", "hydrated runtime starts");
+  assert(
+    e.state.mails.some((m) => m.subjectKey === "missions.c3_mission.mailTicketSubject"),
+    "ticket mail created on hydrated start"
+  );
+  assert(e.state.activeWindow === "mail", "mail workspace opened");
 }
 
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);

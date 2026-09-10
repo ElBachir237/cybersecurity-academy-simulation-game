@@ -7,7 +7,15 @@
 
 import type { GameState, HostRuntime } from "./types";
 import type { TFn } from "./i18n";
-import { DNS_ZONE, INTERNAL_SITES } from "./data/world";
+import {
+  DNS_ZONE,
+  INTERNAL_SITES,
+  firewallAllows,
+  formatFwList,
+  ipInCidr,
+  seedFwRules,
+} from "./data/world";
+import type { FwRule } from "./types";
 
 export interface TermSignals {
   cmd: string;
@@ -70,29 +78,34 @@ export function resolveName(
   return null;
 }
 
+type PathResult = "ok" | "no-iface" | "no-route" | "filtered";
+
+function pathTo(target: string, host: HostRuntime, state: GameState): PathResult {
+  const iface = host.ifaces.eth0 ?? Object.values(host.ifaces)[0];
+  if (!iface || iface.state !== "up" || !iface.ip) return "no-iface";
+  if (target === iface.ip) return "ok";
+  if (target.startsWith("127.")) return "ok";
+  if (iface.cidr && sameSubnet(target, iface.ip, iface.cidr)) return "ok";
+  if (!iface.gw || !iface.cidr || !sameSubnet(iface.gw, iface.ip, iface.cidr)) {
+    return "no-route";
+  }
+  let gwExists = false;
+  for (const h of Object.values(state.world.hosts)) {
+    for (const i of Object.values(h.ifaces)) {
+      if (i.ip === iface.gw) gwExists = true;
+    }
+  }
+  if (!gwExists) return "no-route";
+  if (!firewallAllows(iface.ip, target, state)) return "filtered";
+  return "ok";
+}
+
 export function ipReachable(
   target: string,
   host: HostRuntime,
   state: GameState
 ): boolean {
-  const iface = host.ifaces.eth0 ?? Object.values(host.ifaces)[0];
-  if (!iface || iface.state !== "up" || !iface.ip) return false;
-  if (target === iface.ip) return true;
-  // localhost
-  if (target.startsWith("127.")) return true;
-  // same subnet: direct L2
-  if (iface.cidr && sameSubnet(target, iface.ip, iface.cidr)) return true;
-  // cross subnet: needs a reachable gateway that the world actually owns
-  if (iface.gw) {
-    if (!iface.cidr || !sameSubnet(iface.gw, iface.ip, iface.cidr)) return false;
-    // gateway is reachable if it exists on any world host interface
-    for (const h of Object.values(state.world.hosts)) {
-      for (const i of Object.values(h.ifaces)) {
-        if (i.ip === iface.gw) return true;
-      }
-    }
-  }
-  return false;
+  return pathTo(target, host, state) === "ok";
 }
 
 // ---------------- File content generation ----------------
@@ -211,8 +224,8 @@ function cmdPing(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
   const out: string[] = [];
   const label = isName ? `${target} (${ip})` : ip;
   out.push(`PING ${label} 56(84) bytes of data.`);
-  const reachable = ipReachable(ip, host, state);
-  if (reachable) {
+  const path = pathTo(ip, host, state);
+  if (path === "ok") {
     for (let i = 1; i <= 4; i++) {
       const ms = (0.4 + Math.random() * 2.5).toFixed(2);
       out.push(`64 bytes from ${ip}: icmp_seq=${i} ttl=64 time=${ms} ms`);
@@ -220,10 +233,12 @@ function cmdPing(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
     out.push(t("terminal.pingStats", { target }));
     out.push(t("terminal.packets", { sent: 4, recv: 4, loss: 0 }));
   } else {
-    // distinguish: no local address vs no route vs timeout
     const iface = host.ifaces.eth0 ?? Object.values(host.ifaces)[0];
-    if (!iface || iface.state !== "up" || !iface.ip) {
+    if (path === "no-iface" || !iface || iface.state !== "up" || !iface.ip) {
       out.push("connect: Network is unreachable");
+    } else if (path === "filtered") {
+      out.push(t("terminal.pingStats", { target }));
+      out.push(t("terminal.packets", { sent: 4, recv: 0, loss: 100 }));
     } else {
       for (let i = 1; i <= 2; i++) {
         out.push(`From ${iface.gw ?? iface.ip} icmp_seq=${i} Destination Host Unreachable`);
@@ -233,6 +248,89 @@ function cmdPing(argv: string[], host: HostRuntime, state: GameState, t: TFn): s
     }
   }
   return out;
+}
+
+function isCidr(value: string): boolean {
+  const [ip, bits] = value.split("/");
+  if (!ip || bits === undefined) return false;
+  const n = Number(bits);
+  if (!Number.isInteger(n) || n < 0 || n > 32) return false;
+  return ipInCidr(ip, value);
+}
+
+function nextFwId(rules: FwRule[]): string {
+  let max = 0;
+  for (const rule of rules) {
+    const m = /^FW-(\d+)$/.exec(rule.id);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `FW-${max + 1}`;
+}
+
+function cmdIptables(args: string[], state: GameState, sudo: boolean): string[] {
+  if (!sudo) return ["iptables: Permission denied"];
+  if (!Array.isArray(state.world.fwRules) || state.world.fwRules.length === 0) {
+    state.world.fwRules = seedFwRules();
+  }
+  const rules = state.world.fwRules;
+  const op = args[0];
+  if (!op || op === "-L" || op === "--list") {
+    return formatFwList(rules);
+  }
+  if (op === "-D") {
+    const id = args[1] === "FORWARD" ? args[2] : args[1];
+    if (!id) return ["iptables: usage: iptables -D <id>"];
+    const idx = rules.findIndex((r) => r.id === id);
+    if (idx < 0) return [`iptables: no such rule ${id}`];
+    if (rules[idx].sticky) return [`iptables: cannot delete policy rule ${id}`];
+    const removed = rules.splice(idx, 1)[0];
+    const rtr = state.world.hosts["RTR-HQ"];
+    rtr?.logs.push(`Sep 12 fw: rule ${removed.id} deleted (${removed.src} -> ${removed.dst})`);
+    return [`iptables: deleted ${removed.id}`];
+  }
+  if (op === "-A") {
+    let i = args[1] === "FORWARD" ? 2 : 1;
+    let src = "0.0.0.0/0";
+    let dst = "0.0.0.0/0";
+    let action: FwRule["action"] = "allow";
+    while (i < args.length) {
+      if ((args[i] === "-s" || args[i] === "--source") && args[i + 1]) {
+        src = args[i + 1];
+        i += 2;
+        continue;
+      }
+      if ((args[i] === "-d" || args[i] === "--destination") && args[i + 1]) {
+        dst = args[i + 1];
+        i += 2;
+        continue;
+      }
+      if ((args[i] === "-j" || args[i] === "--jump") && args[i + 1]) {
+        const jump = args[i + 1].toUpperCase();
+        action = jump === "DROP" || jump === "REJECT" || jump === "DENY" ? "deny" : "allow";
+        i += 2;
+        continue;
+      }
+      i += 1;
+    }
+    if (!isCidr(src) || !isCidr(dst)) {
+      return ["iptables: -s and -d must be CIDR (ex: 192.168.10.0/24)"];
+    }
+    const id = nextFwId(rules);
+    rules.push({
+      id,
+      action,
+      src,
+      dst,
+      proto: "any",
+      comment: "added by operator",
+    });
+    const rtr = state.world.hosts["RTR-HQ"];
+    rtr?.logs.push(`Sep 12 fw: rule ${id} ${action} ${src} -> ${dst}`);
+    return [`iptables: appended ${id} ${action} ${src} -> ${dst}`];
+  }
+  return [
+    "iptables: usage: iptables -L | -D <id> | -A FORWARD -s CIDR -d CIDR -j ACCEPT|DROP",
+  ];
 }
 
 // ---------------- Command: ip ----------------
@@ -447,6 +545,7 @@ export function execTerminal(
       out.push("  sudo netplan apply                   — appliquer la config réseau");
       out.push("  sudo dhclient <iface>                — demander un bail DHCP");
       out.push("  sudo ip link set <iface> up|down     — activer une interface");
+      out.push("  sudo iptables -L | -D <id> | -A ...  — politique FORWARD (simulée)");
       out.push("  clear | history                      — écran / historique");
       return { output: out, signals };
     }
@@ -613,6 +712,9 @@ export function execTerminal(
       signals.dhcpRequested = true;
       break;
     }
+    case "iptables":
+      out.push(...cmdIptables(args, state, sudo));
+      break;
     case "ssh":
       out.push(`ssh: ${t("terminal.sshDenied")}`);
       break;

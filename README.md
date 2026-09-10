@@ -44,7 +44,7 @@ Le terminal n’est pas un décor. `ping`, `ip`, `dig` / `nslookup`, `systemctl`
 
 ## Campagne actuelle
 
-Le curriculum affiche **10 chapitres** et **17 filières** (fondamentaux, réseau, SOC, DFIR, cloud, etc.). Les chapitres **1 et 2** sont jouables de bout en bout.
+Le curriculum affiche **10 chapitres** et **17 filières** (fondamentaux, réseau, SOC, DFIR, cloud, etc.). Les chapitres **1, 2 et 3** sont jouables de bout en bout.
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -70,9 +70,23 @@ Boucle complète autour du **plan d’adressage VLAN 40** (`192.168.40.0/26`).
 
 Réussir le chapitre débloque le certificat **Network Foundations**.
 
-### Chapitres 3–10 (`soon`)
+### Chapitre 3 — Sécurité réseau (`released`)
 
-Network Security, SOC Operations, Incident Response, Web Security, DFIR, Cloud Security, DevSecOps, Threat Intelligence — **roadmap, pas encore de missions**.
+Boucle complète autour d’un **pare-feu FORWARD simulé** : défaut inter-VLAN DROP, cœur `10.0.0.0/24` autorisé. `ping` entre VLANs respecte désormais cette politique (sans casser DNS / intranet des chapitres 1–2).
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **Trou dans le pare-feu** (`c3_lab`) | Lab | Règle `FW-LAB` (bureaux → Finance) : lister, observer, supprimer, vérifier |
+| **Le raccourci du prestataire** (`c3_mission`) | Mission | Trou `192.168.0.0/16` → Finance ; mail IT ; appel après lecture ; mauvaise décision Marc = `0.0.0.0/0` |
+| **Simulation : segmentation** (`c3_sim`) | Simulation (examen) | Variantes `any` / `src` / `wide` |
+
+Commandes lab : `sudo iptables -L`, `sudo iptables -D <id>`, `sudo iptables -A FORWARD -s CIDR -d CIDR -j ACCEPT\|DROP`.
+
+Réussir le chapitre débloque le certificat **Network Sentinel**.
+
+### Chapitres 4–10 (`soon`)
+
+SOC Operations, Incident Response, Web Security, DFIR, Cloud Security, DevSecOps, Threat Intelligence — **roadmap, pas encore de missions**.
 
 ---
 
@@ -104,7 +118,7 @@ tests/browser/         Playwright
 
 Points importants :
 
-- L’état du monde (hôtes, interfaces, DNS, services, tickets, NPC) est **persistant** dans la save.
+- L’état du monde (hôtes, interfaces, DNS, services, tickets, NPC, règles pare-feu) est **persistant** dans la save.
 - Les textes d’UI sont des **clés i18n**, pas des chaînes figées dans le state : changer de langue ne casse pas la partie.
 - Une mission est une machine à états : `enter` construit le monde, `handle` valide les événements (`cmd`, mail lu, décision, etc.).
 
@@ -141,6 +155,7 @@ Sans `DATABASE_URL`, les routes `/api/save` et `/api/certificates` échouent, ma
 | `npm run start` | Serveur de production |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm run smoke` | Walkthrough moteur chapitres 1–3 |
 
 Playwright (serveur déjà lancé) :
 
@@ -169,8 +184,6 @@ Classées par priorité produit. Le moteur et le desktop sont déjà trop en ava
 
 C’est le vrai chantier. Sans ça, HORIZON reste une démo du premier jour.
 
-- **Finir le chapitre 2** : mission + simulation autour du subnetting / VLAN / plans d’adressage, pas seulement le calculateur.
-- **Chapitre 3 — Network Security** : firewall, segmentation, règle trop ouverte, blast radius.
 - **Chapitre 4 — SOC** : file d’alertes, faux positifs, escalation, playbooks. L’app SOC existe déjà, elle est quasi vide.
 - **Chapitre 5 — Incident Response** : containment, communication, timeline, leçons apprises.
 - **Chapitres 6–10** dans l’ordre : Web, DFIR, Cloud, DevSecOps, Threat Intel — **une boucle lab → mission → exam par chapitre**, pas un catalogue de compétences orphelines.

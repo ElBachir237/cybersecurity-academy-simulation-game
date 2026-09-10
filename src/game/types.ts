@@ -85,6 +85,17 @@ export interface NpcState {
   mood: "neutral" | "happy" | "annoyed" | "worried";
 }
 
+export interface FwRule {
+  id: string;
+  action: "allow" | "deny";
+  src: string;
+  dst: string;
+  proto: "any" | "tcp" | "udp" | "icmp";
+  port?: number;
+  comment: string;
+  sticky?: boolean;
+}
+
 export interface GameWorld {
   hosts: Record<string, HostRuntime>;
   dns: Record<string, string>; // name -> ip
@@ -93,6 +104,7 @@ export interface GameWorld {
   intranetUp: boolean;
   tickets: Ticket[];
   npc: Record<string, NpcState>;
+  fwRules: FwRule[];
 }
 
 // ---------------- Mail / Chat / Notifications ----------------

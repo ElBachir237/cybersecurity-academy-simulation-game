@@ -1,7 +1,8 @@
 // ============================================================
 // HORIZON CYBER ACADEMY — Mission definitions
 // Chapter 1 (First Day): guided lab -> real mission -> solo exam
-// Chapter 2: subnet calculator lab.
+// Chapter 2: subnet calculator lab -> VLAN 40 ticket -> exam
+// Chapter 3: firewall lab -> vendor hole ticket -> exam
 // Every step is data: enter hooks build the world (mails, chats,
 // calls, notifications) and handlers validate professional
 // reflexes rather than flag hunting.
@@ -15,9 +16,16 @@ import type {
   GameState,
   FxApi,
   HostRuntime,
+  FwRule,
 } from "../types";
 import { resolveName } from "../terminal";
 import type { TFn } from "../i18n";
+import {
+  FINANCE_CIDR,
+  FLOOR4_CIDR,
+  firewallAllows,
+  seedFwRules,
+} from "./world";
 
 // ---------------- event matching helpers ----------------
 const baseCmd = (e: EngineEvent): string | undefined => {
@@ -925,6 +933,20 @@ const c2_mission: MissionDef = {
         relatedHost: "PC-NOUR",
       });
     });
+    fx.mail({
+      from: "itsd",
+      subjectKey: "missions.c2_mission.mailTicketSubject",
+      bodyKey: "missions.c2_mission.mailTicketBody",
+    });
+    fx.chat("itsupport", "nour", fx.t("missions.c2_mission.chatNour1"));
+    fx.chat("itsupport", "lena", fx.t("missions.c2_mission.chatLena1"));
+    fx.notify({
+      severity: "high",
+      source: "IT Service Desk",
+      titleKey: "missions.c2_mission.mailTicketSubject",
+      kind: "it",
+      linkMission: "c2_mission",
+    });
   },
   steps: [
     {
@@ -932,58 +954,6 @@ const c2_mission: MissionDef = {
       type: "brief",
       enter: (fx) => {
         fx.objective("missions.c2_mission.obj1");
-        fx.mail({
-          from: "itsd",
-          subjectKey: "missions.c2_mission.mailTicketSubject",
-          bodyKey: "missions.c2_mission.mailTicketBody",
-        });
-        fx.chat("itsupport", "nour", fx.t("missions.c2_mission.chatNour1"));
-        fx.chat("itsupport", "lena", fx.t("missions.c2_mission.chatLena1"));
-        fx.notify({
-          severity: "high",
-          source: "IT Service Desk",
-          titleKey: "missions.c2_mission.mailTicketSubject",
-          kind: "it",
-          linkMission: "c2_mission",
-        });
-      },
-    },
-    {
-      id: "call",
-      type: "decision",
-      decision: {
-        id: "c2m_call",
-        kind: "call",
-        speaker: "nour",
-        contextKey: "missions.c2_mission.callContext",
-        questionKey: "missions.c2_mission.callQuestion",
-        options: [
-          {
-            id: "A",
-            labelKey: "missions.c2_mission.callA",
-            correct: true,
-            consequenceKey: "missions.c2_mission.callConsequenceA",
-            whyKey: "missions.c2_mission.callConsequenceA",
-            rep: 3,
-          },
-          {
-            id: "B",
-            labelKey: "missions.c2_mission.callB",
-            consequenceKey: "missions.c2_mission.callConsequenceB",
-            whyKey: "missions.c2_mission.callConsequenceB",
-            rep: -3,
-          },
-          {
-            id: "C",
-            labelKey: "missions.c2_mission.callC",
-            consequenceKey: "missions.c2_mission.callConsequenceC",
-            whyKey: "missions.c2_mission.callConsequenceC",
-            rep: -5,
-          },
-        ],
-      },
-      enter: (fx) => {
-        fx.sound("phone");
       },
     },
     {
@@ -1007,6 +977,43 @@ const c2_mission: MissionDef = {
         const done: string[] = [];
         if (e.type === "mail-read" || (e.type === "chat-sent" && e.channel === "itsupport"))
           done.push("t1");
+        if (
+          (done.includes("t1") || mission.tasks["t1"]?.done) &&
+          !mission.decisions["c2m_call"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c2m_call",
+            kind: "call",
+            speaker: "nour",
+            contextKey: "missions.c2_mission.callContext",
+            questionKey: "missions.c2_mission.callQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c2_mission.callA",
+                correct: true,
+                consequenceKey: "missions.c2_mission.callConsequenceA",
+                whyKey: "missions.c2_mission.callConsequenceA",
+                rep: 3,
+              },
+              {
+                id: "B",
+                labelKey: "missions.c2_mission.callB",
+                consequenceKey: "missions.c2_mission.callConsequenceB",
+                whyKey: "missions.c2_mission.callConsequenceB",
+                rep: -3,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c2_mission.callC",
+                consequenceKey: "missions.c2_mission.callConsequenceC",
+                whyKey: "missions.c2_mission.callConsequenceC",
+                rep: -5,
+              },
+            ],
+          });
+        }
         if (e.type === "cmd" && e.hostId === "PC-NOUR") done.push("t2");
         if (ranOn(e, "PC-NOUR", "ip")) done.push("t3");
         if (
@@ -1033,6 +1040,7 @@ const c2_mission: MissionDef = {
         }
         if (
           (done.includes("t3") || mission.tasks["t3"]?.done) &&
+          mission.decisions["c2m_call"] &&
           !mission.decisions["c2m_leave"] &&
           !state.pendingDecision
         ) {
@@ -1254,42 +1262,6 @@ const c2_sim: MissionDef = {
       type: "brief",
       enter: (fx) => {
         fx.objective("missions.c2_sim.obj1");
-        fx.sound("phone");
-      },
-    },
-    {
-      id: "call",
-      type: "decision",
-      decision: {
-        id: "c2s_call",
-        kind: "call",
-        speaker: "nour",
-        contextKey: "missions.c2_sim.callContext",
-        questionKey: "missions.c2_sim.callQuestion",
-        options: [
-          {
-            id: "A",
-            labelKey: "missions.c2_sim.callA",
-            correct: true,
-            consequenceKey: "missions.c2_sim.callConsequenceA",
-            whyKey: "missions.c2_sim.callConsequenceA",
-            rep: 3,
-          },
-          {
-            id: "B",
-            labelKey: "missions.c2_sim.callB",
-            consequenceKey: "missions.c2_sim.callConsequenceB",
-            whyKey: "missions.c2_sim.callConsequenceB",
-            rep: -3,
-          },
-          {
-            id: "C",
-            labelKey: "missions.c2_sim.callC",
-            consequenceKey: "missions.c2_sim.callConsequenceC",
-            whyKey: "missions.c2_sim.callConsequenceC",
-            rep: -6,
-          },
-        ],
       },
     },
     {
@@ -1307,6 +1279,43 @@ const c2_sim: MissionDef = {
         const done: string[] = [];
         if (e.type === "mail-read" || (e.type === "chat-sent" && e.channel === "itsupport"))
           done.push("t1");
+        if (
+          (done.includes("t1") || mission.tasks["t1"]?.done) &&
+          !mission.decisions["c2s_call"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c2s_call",
+            kind: "call",
+            speaker: "nour",
+            contextKey: "missions.c2_sim.callContext",
+            questionKey: "missions.c2_sim.callQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c2_sim.callA",
+                correct: true,
+                consequenceKey: "missions.c2_sim.callConsequenceA",
+                whyKey: "missions.c2_sim.callConsequenceA",
+                rep: 3,
+              },
+              {
+                id: "B",
+                labelKey: "missions.c2_sim.callB",
+                consequenceKey: "missions.c2_sim.callConsequenceB",
+                whyKey: "missions.c2_sim.callConsequenceB",
+                rep: -3,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c2_sim.callC",
+                consequenceKey: "missions.c2_sim.callConsequenceC",
+                whyKey: "missions.c2_sim.callConsequenceC",
+                rep: -6,
+              },
+            ],
+          });
+        }
         if (
           e.type === "cmd" &&
           e.hostId === "PC-NOUR" &&
@@ -1390,6 +1399,653 @@ const c2_sim: MissionDef = {
   },
 };
 
+const MARIE_IP = "192.168.20.45";
+const DNS_IP = "10.0.0.10";
+const WS_IP = "192.168.10.24";
+const NOUR_IP = VLAN40.hostIp;
+
+function ensureMarieOnline(fx: FxApi) {
+  fx.mutateHost("PC-MARIE", (h) => {
+    h.ifaces.eth0 = {
+      state: "up",
+      dhcp: true,
+      ip: MARIE_IP,
+      cidr: 24,
+      gw: "192.168.20.1",
+    };
+    h.services["systemd-networkd"] = "active";
+  });
+}
+
+function resetFw(fx: FxApi, extra: FwRule[]) {
+  fx.setWorld((w) => {
+    w.fwRules = [...seedFwRules(), ...extra];
+  });
+}
+
+function allowFinance(id: string, src: string, comment: string): FwRule {
+  return {
+    id,
+    action: "allow",
+    src,
+    dst: FINANCE_CIDR,
+    proto: "any",
+    comment,
+  };
+}
+
+function financeHoles(state: GameState): FwRule[] {
+  return (state.world.fwRules ?? []).filter(
+    (r) => !r.sticky && r.action === "allow" && r.dst === FINANCE_CIDR
+  );
+}
+
+function financeSegmented(state: GameState): boolean {
+  return (
+    financeHoles(state).length === 0 &&
+    !firewallAllows(WS_IP, MARIE_IP, state) &&
+    !firewallAllows(NOUR_IP, MARIE_IP, state) &&
+    firewallAllows(WS_IP, DNS_IP, state)
+  );
+}
+
+function iptablesList(e: EngineEvent): boolean {
+  return cmdIs(e, "iptables") && (e.argv ?? []).includes("-L");
+}
+
+function iptablesDelete(e: EngineEvent, id: string): boolean {
+  const argv = e.argv ?? [];
+  return cmdIs(e, "iptables") && argv.includes("-D") && argv.includes(id);
+}
+
+function pingHost(e: EngineEvent, hostId: string, ip: string): boolean {
+  return ranOn(e, hostId, "ping") && argAt(e, 0) === ip;
+}
+
+// ============================================================
+// CHAPTER 3 — LAB: close an inter-VLAN hole
+// ============================================================
+const c3_lab: MissionDef = {
+  id: "c3_lab",
+  chapter: 3,
+  kind: "lab",
+  skillIds: ["firewall", "vlan", "network_diag"],
+  prereq: ["c2_sim"],
+  difficulty: 1,
+  hasVariants: false,
+  estimateMin: 12,
+  titleKey: "missions.c3_lab.title",
+  briefKey: "missions.c3_lab.brief",
+  onStart: (fx) => {
+    ensureMarieOnline(fx);
+    resetFw(fx, [
+      allowFinance("FW-LAB", "192.168.10.0/24", "lab hole — office to Finance"),
+    ]);
+  },
+  steps: [
+    {
+      id: "brief",
+      type: "brief",
+      enter: (fx) => {
+        fx.objective("missions.c3_lab.obj1");
+        fx.notify({
+          severity: "info",
+          source: "Academy",
+          titleKey: "chapter3.title",
+          kind: "system",
+          linkMission: "c3_lab",
+        });
+      },
+    },
+    {
+      id: "tasks",
+      type: "tasks",
+      objectiveKey: "missions.c3_lab.obj1",
+      tasks: [
+        { id: "t1", labelKey: "missions.c3_lab.t1", hintKey: "missions.c3_lab.h1" },
+        { id: "t2", labelKey: "missions.c3_lab.t2", hintKey: "missions.c3_lab.h2" },
+        { id: "t3", labelKey: "missions.c3_lab.t3", hintKey: "missions.c3_lab.h3" },
+        { id: "t4", labelKey: "missions.c3_lab.t4", hintKey: "missions.c3_lab.h4" },
+        { id: "t5", labelKey: "missions.c3_lab.t5", hintKey: "missions.c3_lab.h5" },
+      ],
+      handle: ({ state, event: e, mission }) => {
+        const done: string[] = [];
+        if (iptablesList(e)) done.push("t1");
+        if (pingHost(e, "WS-001", MARIE_IP)) done.push("t2");
+        if (iptablesDelete(e, "FW-LAB") || financeHoles(state).length === 0)
+          done.push("t3");
+        if (
+          financeSegmented(state) &&
+          pingHost(e, "WS-001", MARIE_IP)
+        )
+          done.push("t4");
+        if (
+          financeSegmented(state) &&
+          pingHost(e, "WS-001", DNS_IP)
+        )
+          done.push("t5");
+        const complete = ["t1", "t2", "t3", "t4", "t5"].every(
+          (id) => done.includes(id) || mission.tasks[id]?.done
+        );
+        return { doneTasks: done, complete };
+      },
+    },
+    {
+      id: "final",
+      type: "final",
+      enter: (fx) => {
+        fx.awardXp(90);
+        fx.skill("firewall", "practice", 20);
+        fx.skill("vlan", "practice", 15);
+        fx.skill("network_diag", "practice", 10);
+        fx.notify({
+          severity: "info",
+          source: "Academy",
+          titleKey: "notifyContent.missionReady",
+          kind: "system",
+          linkMission: "c3_mission",
+        });
+        fx.sound("unlock");
+      },
+    },
+  ],
+  debrief: (_state, mission): DebriefData => {
+    const score = Math.max(50, 100 - mission.errors * 12 - mission.hintsUsed * 8);
+    return {
+      missionId: "c3_lab",
+      titleKey: "missions.c3_lab.title",
+      outcome: mission.hintsUsed > 3 ? "partial" : "success",
+      score,
+      maxScore: 100,
+      errors: [],
+      skillsValidated: [
+        { id: "firewall", level: "practice" },
+        { id: "vlan", level: "practice" },
+      ],
+      skillsToReview: [],
+      methodKey: "missions.c3_lab.method",
+      nextStepKey: "missions.c3_lab.next",
+      report: "c3_lab — lab firewall hole closed",
+    };
+  },
+};
+
+// ============================================================
+// CHAPTER 3 — MISSION: vendor /16 hole to Finance
+// ============================================================
+const c3_mission: MissionDef = {
+  id: "c3_mission",
+  chapter: 3,
+  kind: "mission",
+  skillIds: ["firewall", "seg_arch", "defense_depth"],
+  prereq: ["c3_lab"],
+  difficulty: 2,
+  hasVariants: false,
+  estimateMin: 16,
+  titleKey: "missions.c3_mission.title",
+  briefKey: "missions.c3_mission.brief",
+  onStart: (fx, state) => {
+    ensureVlan40(fx, state);
+    ensureMarieOnline(fx);
+    resetFw(fx, [
+      allowFinance(
+        "FW-VENDOR",
+        "192.168.0.0/16",
+        "vendor shortcut — all 192.168 to Finance"
+      ),
+    ]);
+    fx.setWorld((w) => {
+      w.tickets = w.tickets.filter((t) => t.id !== "IT-3101" && t.id !== "IT-3102");
+      w.tickets.push({
+        id: "IT-3101",
+        severity: "high",
+        titleKey: "missions.c3_mission.mailTicketSubject",
+        from: "Lena Kovac (IT)",
+        status: "open",
+        createdAt: state.timeMin,
+        relatedHost: "PC-MARIE",
+      });
+    });
+    fx.mail({
+      from: "itsd",
+      subjectKey: "missions.c3_mission.mailTicketSubject",
+      bodyKey: "missions.c3_mission.mailTicketBody",
+    });
+    fx.chat("itsupport", "lena", fx.t("missions.c3_mission.chatLena1"));
+    fx.chat("itsupport", "marc", fx.t("missions.c3_mission.chatMarc1"));
+    fx.notify({
+      severity: "high",
+      source: "IT Service Desk",
+      titleKey: "missions.c3_mission.mailTicketSubject",
+      kind: "it",
+      linkMission: "c3_mission",
+    });
+  },
+  steps: [
+    {
+      id: "brief",
+      type: "brief",
+      enter: (fx) => {
+        fx.objective("missions.c3_mission.obj1");
+      },
+    },
+    {
+      id: "tasks",
+      type: "tasks",
+      objectiveKey: "missions.c3_mission.obj2",
+      tasks: [
+        { id: "t1", labelKey: "missions.c3_mission.t1", hintKey: "missions.c3_mission.h1" },
+        { id: "t2", labelKey: "missions.c3_mission.t2", hintKey: "missions.c3_mission.h2" },
+        { id: "t3", labelKey: "missions.c3_mission.t3", hintKey: "missions.c3_mission.h3" },
+        { id: "t4", labelKey: "missions.c3_mission.t4", hintKey: "missions.c3_mission.h4" },
+        { id: "t5", labelKey: "missions.c3_mission.t5", hintKey: "missions.c3_mission.h5" },
+        { id: "t6", labelKey: "missions.c3_mission.t6", hintKey: "missions.c3_mission.h6" },
+      ],
+      enter: (fx) => {
+        fx.objective("missions.c3_mission.obj2");
+      },
+      handle: ({ fx, state, event: e, mission }) => {
+        const done: string[] = [];
+        if (e.type === "mail-read" || (e.type === "chat-sent" && e.channel === "itsupport"))
+          done.push("t1");
+        if (
+          (done.includes("t1") || mission.tasks["t1"]?.done) &&
+          !mission.decisions["c3m_call"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c3m_call",
+            kind: "call",
+            speaker: "lena",
+            contextKey: "missions.c3_mission.callContext",
+            questionKey: "missions.c3_mission.callQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c3_mission.callA",
+                correct: true,
+                consequenceKey: "missions.c3_mission.callConsequenceA",
+                whyKey: "missions.c3_mission.callConsequenceA",
+                rep: 3,
+              },
+              {
+                id: "B",
+                labelKey: "missions.c3_mission.callB",
+                consequenceKey: "missions.c3_mission.callConsequenceB",
+                whyKey: "missions.c3_mission.callConsequenceB",
+                rep: -4,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c3_mission.callC",
+                consequenceKey: "missions.c3_mission.callConsequenceC",
+                whyKey: "missions.c3_mission.callConsequenceC",
+                rep: -6,
+              },
+            ],
+          });
+        }
+        if (iptablesList(e)) done.push("t2");
+        if (
+          (done.includes("t2") || mission.tasks["t2"]?.done) &&
+          mission.decisions["c3m_call"] &&
+          !mission.decisions["c3m_marc"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c3m_marc",
+            kind: "decision",
+            contextKey: "missions.c3_mission.decisionContext",
+            questionKey: "missions.c3_mission.decisionQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c3_mission.decA",
+                consequenceKey: "missions.c3_mission.decConsequenceA",
+                whyKey: "missions.c3_mission.learningWhy",
+                rep: -8,
+                fx: (fxx, s) => {
+                  const rt = s.missions["c3_mission"];
+                  if (rt && !rt.errorKeys.includes("opened_any")) {
+                    rt.errors += 1;
+                    rt.errorKeys.push("opened_any");
+                  }
+                  fxx.setWorld((w) => {
+                    w.fwRules = [
+                      ...(w.fwRules ?? seedFwRules()),
+                      allowFinance("FW-ANY", "0.0.0.0/0", "Marc — open Finance to the world"),
+                    ];
+                    w.tickets.push({
+                      id: "IT-3102",
+                      severity: "critical",
+                      titleKey: "missions.c3_mission.decConsequenceA",
+                      from: "Soriya Chan (SOC)",
+                      status: "open",
+                      createdAt: s.timeMin,
+                      relatedHost: "PC-MARIE",
+                    });
+                  });
+                  fxx.notify({
+                    severity: "critical",
+                    source: "SOC",
+                    titleKey: "missions.c3_mission.decConsequenceA",
+                    kind: "soc",
+                  });
+                  fxx.setLearning({
+                    titleKey: "missions.c3_mission.learningTitle",
+                    impactKey: "missions.c3_mission.learningImpact",
+                    whyKey: "missions.c3_mission.learningWhy",
+                    checkKey: "missions.c3_mission.learningCheck",
+                  });
+                  fxx.sound("alert");
+                },
+              },
+              {
+                id: "B",
+                labelKey: "missions.c3_mission.decB",
+                correct: true,
+                consequenceKey: "missions.c3_mission.decConsequenceB",
+                whyKey: "missions.c3_mission.decConsequenceB",
+                rep: 4,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c3_mission.decC",
+                consequenceKey: "missions.c3_mission.decConsequenceC",
+                whyKey: "missions.c3_mission.learningWhyLeave",
+                rep: -5,
+                fx: (fxx, s) => {
+                  const rt = s.missions["c3_mission"];
+                  if (rt && !rt.errorKeys.includes("left_wide_hole")) {
+                    rt.errors += 1;
+                    rt.errorKeys.push("left_wide_hole");
+                  }
+                  fxx.setLearning({
+                    titleKey: "missions.c3_mission.learningTitleLeave",
+                    impactKey: "missions.c3_mission.learningImpactLeave",
+                    whyKey: "missions.c3_mission.learningWhyLeave",
+                    checkKey: "missions.c3_mission.learningCheckLeave",
+                  });
+                  fxx.sound("alert");
+                },
+              },
+            ],
+          });
+        }
+        if (iptablesDelete(e, "FW-VENDOR") || iptablesDelete(e, "FW-ANY"))
+          done.push("t3");
+        if (financeSegmented(state)) done.push("t4");
+        if (
+          financeSegmented(state) &&
+          (pingHost(e, "WS-001", MARIE_IP) || pingHost(e, "WS-001", DNS_IP))
+        )
+          done.push("t5");
+        if (
+          e.type === "chat-sent" &&
+          e.channel === "itsupport" &&
+          (mission.tasks["t5"]?.done || done.includes("t5"))
+        ) {
+          done.push("t6");
+          fx.chat("itsupport", "lena", fx.t("missions.c3_mission.chatLena2"));
+          fx.sound("success");
+        }
+        const complete = ["t1", "t2", "t3", "t4", "t5", "t6"].every(
+          (id) => done.includes(id) || mission.tasks[id]?.done
+        );
+        return { doneTasks: done, complete };
+      },
+    },
+    {
+      id: "final",
+      type: "final",
+      enter: (fx) => {
+        fx.awardXp(170);
+        fx.skill("firewall", "competent", 25);
+        fx.skill("seg_arch", "practice", 20);
+        fx.skill("defense_depth", "learning", 15);
+        fx.notify({
+          severity: "info",
+          source: "Academy",
+          titleKey: "notifyContent.simReady",
+          kind: "system",
+          linkMission: "c3_sim",
+        });
+        fx.sound("unlock");
+      },
+    },
+  ],
+  debrief: (_state, mission, t): DebriefData => {
+    const score = Math.max(50, 100 - mission.errors * 12 - mission.hintsUsed * 8);
+    const openedAny = mission.decisions["c3m_marc"] === "A";
+    const leftHole = mission.decisions["c3m_marc"] === "C";
+    const errors: DebriefData["errors"] = [];
+    if (openedAny) {
+      errors.push({
+        whatKey: "missions.c3_mission.learningTitle",
+        whyKey: "missions.c3_mission.learningWhy",
+      });
+    }
+    if (leftHole) {
+      errors.push({
+        whatKey: "missions.c3_mission.learningTitleLeave",
+        whyKey: "missions.c3_mission.learningWhyLeave",
+      });
+    }
+    return {
+      missionId: "c3_mission",
+      titleKey: "missions.c3_mission.title",
+      outcome: errors.length || mission.hintsUsed ? "partial" : "success",
+      score,
+      maxScore: 100,
+      errors,
+      skillsValidated: [
+        { id: "firewall", level: "competent" },
+        { id: "seg_arch", level: "practice" },
+      ],
+      skillsToReview: errors.length ? ["firewall"] : [],
+      methodKey: "missions.c3_mission.method",
+      nextStepKey: "missions.c3_mission.next",
+      report: [
+        t("missions.c3_mission.reportSubject"),
+        "------------------------------------------------------------",
+        `Score: ${score}/100`,
+        openedAny ? t("missions.c3_mission.learningWhy") : "Hole FW-VENDOR removed. Finance re-segmented.",
+        "------------------------------------------------------------",
+      ].join("\n"),
+    };
+  },
+};
+
+// ============================================================
+// CHAPTER 3 — SIMULATION (exam, variants: any | src | wide)
+// ============================================================
+const C3_SIM_VARIANTS = ["any", "src", "wide"] as const;
+type C3SimVariant = (typeof C3_SIM_VARIANTS)[number];
+
+const c3_sim: MissionDef = {
+  id: "c3_sim",
+  chapter: 3,
+  kind: "simulation",
+  skillIds: ["firewall", "vlan", "seg_arch", "defense_depth"],
+  prereq: ["c3_mission"],
+  difficulty: 3,
+  hasVariants: true,
+  variants: ["any", "src", "wide"],
+  estimateMin: 14,
+  titleKey: "missions.c3_sim.title",
+  briefKey: "missions.c3_sim.brief",
+  onStart: (fx, state, variant) => {
+    const v = (
+      C3_SIM_VARIANTS.includes(variant as C3SimVariant) ? variant : "any"
+    ) as C3SimVariant;
+    ensureVlan40(fx, state);
+    ensureMarieOnline(fx);
+    setNourAddr(
+      fx,
+      VLAN40.hostIp,
+      VLAN40.cidr,
+      VLAN40.gw,
+      "Sep 12 16:02:01 pc-nour systemd-networkd: eth0: on VLAN 40 plan"
+    );
+    const src =
+      v === "any" ? "0.0.0.0/0" : v === "src" ? FLOOR4_CIDR : "192.168.0.0/16";
+    resetFw(fx, [
+      allowFinance("FW-HOLE", src, `exam hole — ${v}`),
+    ]);
+    fx.mail({
+      from: "itsd",
+      subjectKey: "missions.c3_sim.mailSubject",
+      bodyKey: "missions.c3_sim.mailBody",
+    });
+    fx.chat("itsupport", "soriya", fx.t("missions.c3_sim.chatSoriya1"));
+    fx.notify({
+      severity: "critical",
+      source: "SOC",
+      titleKey: "missions.c3_sim.mailSubject",
+      kind: "soc",
+      linkMission: "c3_sim",
+    });
+  },
+  steps: [
+    {
+      id: "brief",
+      type: "brief",
+      enter: (fx) => {
+        fx.objective("missions.c3_sim.obj1");
+      },
+    },
+    {
+      id: "tasks",
+      type: "tasks",
+      objectiveKey: "missions.c3_sim.obj1",
+      tasks: [
+        { id: "t1", labelKey: "missions.c3_sim.t1" },
+        { id: "t2", labelKey: "missions.c3_sim.t2" },
+        { id: "t3", labelKey: "missions.c3_sim.t3" },
+        { id: "t4", labelKey: "missions.c3_sim.t4" },
+        { id: "t5", labelKey: "missions.c3_sim.t5" },
+      ],
+      handle: ({ fx, state, event: e, mission }) => {
+        const v = mission.variant as C3SimVariant;
+        const probeHost = v === "src" ? "PC-NOUR" : "WS-001";
+        const done: string[] = [];
+        if (e.type === "mail-read" || (e.type === "chat-sent" && e.channel === "itsupport"))
+          done.push("t1");
+        if (
+          (done.includes("t1") || mission.tasks["t1"]?.done) &&
+          !mission.decisions["c3s_call"] &&
+          !state.pendingDecision
+        ) {
+          fx.setDecision({
+            id: "c3s_call",
+            kind: "call",
+            speaker: "soriya",
+            contextKey: "missions.c3_sim.callContext",
+            questionKey: "missions.c3_sim.callQuestion",
+            options: [
+              {
+                id: "A",
+                labelKey: "missions.c3_sim.callA",
+                correct: true,
+                consequenceKey: "missions.c3_sim.callConsequenceA",
+                whyKey: "missions.c3_sim.callConsequenceA",
+                rep: 3,
+              },
+              {
+                id: "B",
+                labelKey: "missions.c3_sim.callB",
+                consequenceKey: "missions.c3_sim.callConsequenceB",
+                whyKey: "missions.c3_sim.callConsequenceB",
+                rep: -4,
+              },
+              {
+                id: "C",
+                labelKey: "missions.c3_sim.callC",
+                consequenceKey: "missions.c3_sim.callConsequenceC",
+                whyKey: "missions.c3_sim.callConsequenceC",
+                rep: -6,
+              },
+            ],
+          });
+        }
+        if (iptablesList(e) || pingHost(e, probeHost, MARIE_IP) || pingHost(e, "WS-001", MARIE_IP))
+          done.push("t2");
+        if (iptablesDelete(e, "FW-HOLE") || financeSegmented(state)) done.push("t3");
+        if (
+          financeSegmented(state) &&
+          (pingHost(e, probeHost, MARIE_IP) || pingHost(e, "WS-001", DNS_IP))
+        )
+          done.push("t4");
+        if (
+          e.type === "chat-sent" &&
+          e.channel === "itsupport" &&
+          (mission.tasks["t4"]?.done || done.includes("t4"))
+        ) {
+          done.push("t5");
+          fx.chat("itsupport", "soriya", fx.t("missions.c3_sim.chatSoriya2"));
+          fx.sound("success");
+        }
+        const complete = ["t1", "t2", "t3", "t4", "t5"].every(
+          (id) => done.includes(id) || mission.tasks[id]?.done
+        );
+        return { doneTasks: done, complete };
+      },
+    },
+    {
+      id: "final",
+      type: "final",
+      enter: (fx, state) => {
+        const rt = state.missions["c3_sim"];
+        const clean = !rt?.errors && !rt?.hintsUsed;
+        fx.awardXp(200);
+        fx.awardBadge("firewall_architect");
+        if (clean) fx.awardBadge("methodical");
+        fx.skill("firewall", "competent", 30);
+        fx.skill("seg_arch", "competent", 25);
+        fx.skill("defense_depth", "practice", 20);
+        fx.skill("vlan", "competent", 10);
+      },
+    },
+  ],
+  debrief: (_state, mission, t): DebriefData => {
+    const score = Math.max(50, 100 - mission.errors * 12 - mission.hintsUsed * 8);
+    const v = mission.variant as C3SimVariant;
+    const errors: DebriefData["errors"] = [];
+    if (mission.decisions["c3s_call"] === "B" || mission.decisions["c3s_call"] === "C") {
+      errors.push({
+        whatKey: "missions.c3_sim.callQuestion",
+        whyKey: `missions.c3_sim.callConsequence${mission.decisions["c3s_call"]}`,
+      });
+    }
+    return {
+      missionId: "c3_sim",
+      titleKey: "missions.c3_sim.title",
+      outcome: errors.length || mission.hintsUsed ? "partial" : "success",
+      score,
+      maxScore: 100,
+      errors,
+      skillsValidated: [
+        { id: "firewall", level: "competent" },
+        { id: "seg_arch", level: "competent" },
+        { id: "defense_depth", level: "practice" },
+      ],
+      skillsToReview: errors.length ? ["firewall"] : [],
+      methodKey: "missions.c3_sim.method",
+      nextStepKey: "missions.c3_sim.next",
+      report: [
+        t("missions.c3_sim.reportSubject", { host: "FW-CORE" }),
+        "------------------------------------------------------------",
+        `Variant: ${v}`,
+        `Score: ${score}/100`,
+        `Cause racine: ${t(`missions.c3_sim.cause_${v}`)}`,
+        "Actions: lister FORWARD, supprimer la règle trop large,",
+        "vérifier ping Finance (timeout) et ping DNS (OK).",
+        "------------------------------------------------------------",
+      ].join("\n"),
+    };
+  },
+};
+
 // ---------------- Registry ----------------
 export const MISSIONS: Record<string, MissionDef> = {
   c1_lab,
@@ -1398,6 +2054,9 @@ export const MISSIONS: Record<string, MissionDef> = {
   c2_lab,
   c2_mission,
   c2_sim,
+  c3_lab,
+  c3_mission,
+  c3_sim,
 };
 
 export function getMission(id: string): MissionDef | undefined {
@@ -1411,6 +2070,9 @@ export const MISSION_ORDER = [
   "c2_lab",
   "c2_mission",
   "c2_sim",
+  "c3_lab",
+  "c3_mission",
+  "c3_sim",
 ];
 
 export function pickSimVariant(attempts: number): string {
