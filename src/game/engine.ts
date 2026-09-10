@@ -45,6 +45,7 @@ import {
   seedVhosts,
 } from "./data/world";
 import { applyWorkshopAction, emptyWorkshop } from "./data/workshop";
+import { applySocAction, emptySocAlerts } from "./data/soc";
 import {
   MISSIONS,
   MISSION_ORDER,
@@ -152,6 +153,7 @@ export function createInitialState(profile: Profile): GameState {
       vhosts: seedVhosts(),
       directory: seedDirectory(),
       workshop: emptyWorkshop(),
+      socAlerts: emptySocAlerts(),
       tickets: [
         {
           id: "IT-1041",
@@ -283,6 +285,7 @@ export function hydrateProgression(state: GameState): GameState {
   if (completed.has("c5_sim")) chapter = Math.max(chapter, 6);
   if (completed.has("c6_sim")) chapter = Math.max(chapter, 7);
   if (completed.has("e5_sim")) chapter = Math.max(chapter, 8);
+  if (completed.has("e6_sim")) chapter = Math.max(chapter, 9);
   const seededVhosts = seedVhosts();
   const vhosts = { ...seededVhosts, ...(state.world?.vhosts ?? {}) };
   const seededDir = seedDirectory();
@@ -304,6 +307,7 @@ export function hydrateProgression(state: GameState): GameState {
       directory,
       dns,
       workshop: state.world?.workshop ?? emptyWorkshop(),
+      socAlerts: state.world?.socAlerts ?? emptySocAlerts(),
     },
   };
 }
@@ -850,6 +854,7 @@ export class GameEngine {
   /** Generic action event (labs, calculators, custom interactions). */
   dispatchAction(action: string, payload?: Record<string, unknown>): void {
     applyWorkshopAction(this.state, action, payload);
+    applySocAction(this.state, action, payload);
     this.dispatch({ type: "action", action, payload });
   }
 
@@ -983,6 +988,13 @@ export class GameEngine {
     if (def.id === "c2_lab" || def.id.startsWith("e5_")) {
       this.openApp("network");
       if (def.id !== "c2_lab") this.openApp("terminal");
+      return;
+    }
+    if (def.id.startsWith("e6_")) {
+      this.openApp("soc");
+      this.openApp("terminal");
+      if (def.id !== "e6_lab") this.openApp("mail");
+      this.focusWindow("soc");
       return;
     }
     if (def.id === "c5_web" || def.id === "c5_sim") {
@@ -1198,6 +1210,7 @@ export class GameEngine {
     if (this.state.completedMissions.includes("c5_sim")) this.state.chapter = Math.max(this.state.chapter, 6);
     if (this.state.completedMissions.includes("c6_sim")) this.state.chapter = Math.max(this.state.chapter, 7);
     if (this.state.completedMissions.includes("e5_sim")) this.state.chapter = Math.max(this.state.chapter, 8);
+    if (this.state.completedMissions.includes("e6_sim")) this.state.chapter = Math.max(this.state.chapter, 9);
 
     this.recomputeRecommendation();
     this.state.activeMissionId = null;

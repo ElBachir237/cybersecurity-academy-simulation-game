@@ -7,6 +7,7 @@
 // Chapter 5: nginx/smbd lab -> vhost + DNS -> Samba AD user -> exam
 // Chapter 6: pfSense hole -> MikroTik branch -> UniFi guest isolation -> exam
 // Chapter 7: workshop place/cable -> lab.horizon.local -> exam
+// Chapter 8: SOC L1 triage -> phishing -> exam
 // Every step is data: enter hooks build the world (mails, chats,
 // calls, notifications) and handlers validate professional
 // reflexes rather than flag hunting.
@@ -35,6 +36,7 @@ import { c4_desk, c4_lab, c4_sim, c4_wifi } from "./missionsChapter4";
 import { c5_ad, c5_lab, c5_sim, c5_web } from "./missionsChapter5";
 import { c6_lab, c6_mt, c6_sim, c6_unifi } from "./missionsChapter6";
 import { e5_lab, e5_sim, e5_site } from "./missionsChapterE5";
+import { e6_lab, e6_phish, e6_sim } from "./missionsChapterE6";
 
 // ---------------- event matching helpers ----------------
 const baseCmd = (e: EngineEvent): string | undefined => {
@@ -2649,6 +2651,9 @@ export const MISSIONS: Record<string, MissionDef> = {
   e5_lab,
   e5_site,
   e5_sim,
+  e6_lab,
+  e6_phish,
+  e6_sim,
 };
 
 export function getMission(id: string): MissionDef | undefined {
@@ -2682,6 +2687,9 @@ export const MISSION_ORDER = [
   "e5_lab",
   "e5_site",
   "e5_sim",
+  "e6_lab",
+  "e6_phish",
+  "e6_sim",
 ];
 
 export function pickSimVariant(attempts: number): string {

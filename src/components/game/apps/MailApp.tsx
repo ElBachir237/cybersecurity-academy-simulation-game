@@ -146,6 +146,19 @@ export default function MailApp() {
             <div className="term-text whitespace-pre-wrap rounded-lg bg-black/30 p-4 text-hz-text/90">
               {t(current.bodyKey)}
             </div>
+            {current.phish && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  data-testid="mail-report-phish"
+                  className="hz-btn hz-btn-primary !text-[12px]"
+                  disabled={!!current.reported}
+                  onClick={() => engine.dispatchAction("mail-report-phish", { mailId: current.id })}
+                >
+                  {current.reported ? t("mail.reported") : t("mail.reportPhish")}
+                </button>
+              </div>
+            )}
             {current.attachments?.length ? (
               <div className="mt-4">
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-hz-muted">

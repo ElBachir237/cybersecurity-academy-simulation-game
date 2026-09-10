@@ -7,6 +7,7 @@
 import type { TFn } from "./i18n";
 import type { WorkspaceState } from "./workspace";
 import type { WorkshopState } from "./data/workshop";
+import type { SocAlert } from "./data/soc";
 
 export type Lang = "fr" | "en";
 
@@ -160,6 +161,7 @@ export interface GameWorld {
   vhosts?: Record<string, Vhost>;
   directory?: Record<string, DirectoryUser>;
   workshop?: WorkshopState;
+  socAlerts?: SocAlert[];
 }
 
 // ---------------- Mail / Chat / Notifications ----------------
@@ -171,6 +173,7 @@ export interface Mail {
   bodyKey: string;
   attachments?: { name: string; kind: "log" | "doc" | "screenshot" }[];
   phish?: boolean;
+  reported?: boolean;
   at: number;
 }
 

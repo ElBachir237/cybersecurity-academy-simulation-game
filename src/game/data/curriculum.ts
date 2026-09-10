@@ -173,7 +173,14 @@ export const CHAPTERS: ChapterDef[] = [
     theoryKeys: ["e5_place", "e5_addr", "e5_site"],
     missionIds: ["e5_lab", "e5_site", "e5_sim"],
   },
-  { id: 8, titleKey: "SOC L1", status: "soon", theoryKeys: [], missionIds: [] },
+  {
+    id: 8,
+    titleKey: "chapter8",
+    subKey: "chapter8",
+    status: "released",
+    theoryKeys: ["e6_triage", "e6_logs", "e6_phish"],
+    missionIds: ["e6_lab", "e6_phish", "e6_sim"],
+  },
   { id: 9, titleKey: "SOC L2", status: "soon", theoryKeys: [], missionIds: [] },
   { id: 10, titleKey: "Incident Response", status: "soon", theoryKeys: [], missionIds: [] },
   { id: 11, titleKey: "DFIR", status: "soon", theoryKeys: [], missionIds: [] },
@@ -200,6 +207,7 @@ export const BADGES: BadgeDef[] = [
   { id: "directory_clerk", icon: "users", nameKey: "badges.directory_clerk.name", descKey: "badges.directory_clerk.desc" },
   { id: "vendor_net", icon: "server", nameKey: "badges.vendor_net.name", descKey: "badges.vendor_net.desc" },
   { id: "rack_builder", icon: "layers", nameKey: "badges.rack_builder.name", descKey: "badges.rack_builder.desc" },
+  { id: "soc_triage", icon: "shield", nameKey: "badges.soc_triage.name", descKey: "badges.soc_triage.desc" },
 ];
 
 export interface TitleDef {
@@ -280,6 +288,13 @@ export const CERTIFICATES: CertDef[] = [
     level: "Chapter 7",
     missionIds: ["e5_lab", "e5_site", "e5_sim"],
     skills: ["seg_arch", "pfsense", "web_hosting"],
+  },
+  {
+    id: "soc_l1",
+    titleKey: "SOC Analyst L1",
+    level: "Chapter 8",
+    missionIds: ["e6_lab", "e6_phish", "e6_sim"],
+    skills: ["alert_triage", "siem", "log_analysis"],
   },
 ];
 

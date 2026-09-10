@@ -34,7 +34,7 @@ Un bureau **HORIZON OS** avec des fenêtres, des notifications, du son, et une s
 | **Chat** | IT-SUPPORT, collègues, appels / décisions |
 | **Terminal** | Shell Linux cohérent avec l’état du monde |
 | **Network** | Topologie, hôtes, calculateur CIDR |
-| **SOC** | Alertes et triage (socle, encore peu de contenu) |
+| **SOC** | File SIEM, triage L1, escalade (ch. 8) |
 | **Files / Tickets / Browser** | Contexte d’entreprise |
 | **Skills / Portfolio** | Compétences, badges, certificats, dossier de carrière |
 
@@ -58,7 +58,7 @@ Ce sont des commandes **d’exploitation légitime** (admin, diag, durcissement)
 
 ## Campagne actuelle
 
-Le curriculum **jouable** aujourd’hui : chapitres **1 à 7**. La vision carrière (SOC → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 8–11 en « à venir ».
+Le curriculum **jouable** aujourd’hui : chapitres **1 à 8**. La vision carrière (SOC L2 → architecte / GRC) est décrite plus bas ; l’Académie affiche les paliers 9–11 en « à venir ».
 
 ### Chapitre 1 — First Day (`released`)
 
@@ -159,6 +159,20 @@ Commandes : boutons palette + Câbler ; `ifconfig em1 <ip>/<cidr>` (pfSense) ; `
 
 Réussir le chapitre débloque le certificat **Junior Architect**.
 
+### Chapitre 8 — SOC L1 (`released`)
+
+File SIEM dans l’app **SOC**. Dix alertes dont **une** vraie. On **trie** (faux positif vs escalade), on **confirme dans les logs**, on **signale** un phishing — on n’exploite rien.
+
+| Mission | Type | Sujet |
+| --- | --- | --- |
+| **La file du matin** (`e6_lab`) | Lab | 10 alertes ; fermer le bruit ; `journalctl -u sshd` sur `SRV-WEB` ; n’escalader que `SOC-8009` ; dumper la file = `flood_soriya` |
+| **Le mail horiz0n** (`e6_phish`) | Mission | Mail `it-security@horiz0n.corp` ; signaler, ne pas cliquer (`phish_click`) ; escalader `MAIL-PHISH` |
+| **Simulation : quart L1** (`e6_sim`) | Simulation | Variantes `noise` / `brute` / `phish` |
+
+Commandes / UI : boutons Faux positif / Escalader dans le SOC ; `journalctl -u sshd` ; `grep Failed /var/log/auth.log` ; bouton **Signaler au SOC** dans Mail. Rapport sur le canal **SOC**.
+
+Réussir le chapitre débloque le certificat **SOC Analyst L1**.
+
 ---
 
 ## Vision : une carrière, pas un catalogue
@@ -211,11 +225,11 @@ Même politique, **syntaxes différentes** : un trou `0.0.0.0/0` se voit aussi b
 
 Chaque chapitre : **lab + tickets terrain + décision + examen à variantes**, certificat, skills branchées sur le moteur. Les titres ci-dessous sont le **but métier** ; l’Académie actuelle affiche encore 10 lignes « soon » — elles seront renommées / étendues au fur et à mesure.
 
-### Chapitres 1–7 — `released` (années 0–2)
+### Chapitres 1–8 — `released` (années 0–2)
 
 Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / nginx / AD simulé, **puis pfSense / MikroTik / passerelle UniFi**. Voir ci-dessus.
 
-**Compétences déjà en jeu :** terminal, DNS, DHCP, IPv4/CIDR, VLAN, switching d’accès, firewall FORWARD, NAT trop ouvert, **ipconfig / netsh**, UniFi SSID/VLAN, compte Windows, spooler, **systemctl / nginx / vhost / samba-tool**, **pfctl / easyrule**, **RouterOS `/ip route` + NAT**, **set-guest-isolation**.
+**Compétences déjà en jeu :** terminal, DNS, DHCP, IPv4/CIDR, VLAN, switching d’accès, firewall FORWARD, NAT trop ouvert, **ipconfig / netsh**, UniFi SSID/VLAN, compte Windows, spooler, **systemctl / nginx / vhost / samba-tool**, **pfctl / easyrule**, **RouterOS `/ip route` + NAT**, **set-guest-isolation**, **atelier palier 1**, **triage SIEM / phishing L1**.
 
 ### Chapitre 5 — Systèmes & hébergement (`released`)
 
@@ -235,9 +249,7 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Atelier architecture — palier 1 (`released`) :** tu **places** un pfSense, un switch, un AP UniFi, un serveur web, un PC de test ; tu câbles via le switch ; tu adresses `10.20.0.0/24` ; `lab.horizon.local` répond au curl.
 
-### Chapitre 7 — SOC L1
-
-*(Dans l’Académie, le palier 7 jouable est l’atelier ; le SOC L1 reste le prochain métier, affiché en « à venir ».)*
+### Chapitre 8 — SOC L1 (`released`)
 
 **But :** porte d’entrée cyber. File d’alertes, SIEM, phishing, faux positif, escalation **dans le temps imparti**.
 
@@ -245,13 +257,13 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Skills :** `alert_triage`, `siem`, `log_analysis`. Certificat : **SOC Analyst L1**. L’app SOC se remplit pour de vrai. **Co-op** possible (helpdesk + L1).
 
-### Chapitre 8 — Analyste / SOC L2
+### Chapitre 9 — Analyste / SOC L2
 
 **But :** plus d’autonomie : endpoint (EDR **simulé**), hunting léger, malware en **sandbox** (pas d’exécutable).
 
 **Skills :** `log_analysis`, `malware_triage`, `ioc`, `threat_hunting`. Certificat : **Security Analyst**.
 
-### Chapitre 9 — Réponse à incident
+### Chapitre 10 — Réponse à incident
 
 **But :** contenir, communiquer, timeline — sous pression (timer, direction).
 
@@ -259,19 +271,19 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Skills :** `incident_response`, `defense_depth`. Certificat : **Incident Responder**.
 
-### Chapitre 10 — DFIR
+### Chapitre 11 — DFIR
 
 **But :** preuve et récit. Comment est-il entré, qu’a-t-il touché, quoi extraire — artefacts **dans** HORIZON.
 
 **Skills :** `forensics`, `timeline`, `ioc`. Certificat : **DFIR Analyst**.
 
-### Chapitre 11 — Sécurité web & applicative (défense)
+### Chapitre 12 — Sécurité web & applicative (défense)
 
 **But :** durcir et **exploiter** l’hébergement : vhosts, TLS, reverse proxy, perms, headers — le site public HORIZON tourne **dans** le Browser. Pas de kit d’exploitation.
 
 **Skills :** `http`, `auth`, `web_security`, `api_security`. Certificat : **AppSec Defender**.
 
-### Chapitre 12 — Cloud HORIZON & DevSecOps
+### Chapitre 13 — Cloud HORIZON & DevSecOps
 
 **But :** IAM trop large, SG `0.0.0.0/0`, secret dans Git, CI — analogue du NAT / du `/16`, dans le cloud **simulé**.
 
@@ -279,7 +291,7 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Atelier architecture — palier 2 :** le siège + un VPC HORIZON, Zero Trust basique.
 
-### Chapitre 13 — Ingénieur sécurité / architecture
+### Chapitre 14 — Ingénieur sécurité / architecture
 
 **But :** concevoir : segmentation, IAM, défense en profondeur, Zero Trust **sur le parc déjà vécu**.
 
@@ -287,13 +299,13 @@ Helpdesk Linux, adressage, segmentation, helpdesk Windows / Wi-Fi, serveurs / ng
 
 **Skills :** `seg_arch`, `zero_trust`, `iam`, `pki`. Certificat : **Security Engineer**.
 
-### Chapitre 14 — GRC & management
+### Chapitre 15 — GRC & management
 
 **But :** risque, policy, audit, fournisseurs, arbitrage avec Marc et la direction. Moins de CLI, plus de décisions qui **restent** sur le CV du personnage.
 
 **Skills :** `risk`, `audit`. Certificat : **GRC Practitioner**.
 
-### Chapitre 15 — Capstone (architecte / CISO junior)
+### Chapitre 16 — Capstone (architecte / CISO junior)
 
 **But :** un incident qui traverse tout le parcours (réseau + AD + SOC + cloud + comms). Rapport, architecture, leçon apprise. Titre de fin : **Security Architect** / lead.
 
@@ -315,14 +327,14 @@ On ne code pas 15 chapitres d’un coup. Chaque palier = contenu jouable + smoke
 | **E3** | Ch. 5 Systèmes + AD simulé + **hébergement** (vhost nginx, site visible dans Browser) | **Fait** |
 | **E4** | Ch. 6 : **pfSense + MikroTik RouterOS + passerelle UniFi** (plus le FW générique seul) | **Fait** |
 | **E5** | **Atelier palier 1** : poser / câbler / configurer ces boîtes + un site intranet | **Fait** |
-| **E6** | Ch. 7 SOC L1 + app SOC branchée + timer | Porte d’entrée cyber |
+| **E6** | Ch. 8 SOC L1 + app SOC branchée + timer | **Fait** |
 | **E7** | Co-op 2 joueurs (helpdesk + SOC) + vue formateur | Travail en équipe |
-| **E8** | Ch. 8–10 (L2, IR, DFIR) dans l’ordre | Analyste → DFIR |
+| **E8** | Ch. 9–11 (L2, IR, DFIR) dans l’ordre | Analyste → DFIR |
 | **E9** | Ch. 11–12 (web défense, cloud HORIZON) | Ingénieur |
 | **E10** | Atelier palier 2–3 + ch. 13 architecture 5★ | Concevoir et faire tourner |
 | **E11** | Ch. 14–15 GRC + capstone | Management / expert |
 
-**Prochaine implémentation :** étape **E6** (ch. 8 SOC L1). Pas l’atelier 5★.
+**Prochaine implémentation :** étape **E7** (co-op helpdesk + SOC). Pas l’atelier 5★.
 
 ---
 
@@ -488,13 +500,13 @@ Tout nouveau contenu « offensif » (web, malware, purple) reste **dans la ficti
 | Couche | Maturité |
 | --- | --- |
 | Desktop OS, fenêtres, FR/EN, save locale | Avancée |
-| Moteur + terminal | Solide pour les ch. 1–7 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier) |
-| Contenu jouable | Chapitres 1–7 (labs + tickets + exams à variantes + atelier palier 1) |
-| Curriculum carrière (ch. 8–15, SOC, atelier 5★) | Vision écrite, pas encore jouable |
-| SOC, certificats serveur, classe | Amorcé |
+| Moteur + terminal | Solide pour les ch. 1–8 (Linux, Windows, VLAN, FW, switch, UniFi, pfSense, RouterOS, atelier, SIEM L1) |
+| Contenu jouable | Chapitres 1–8 (labs + tickets + exams à variantes + atelier palier 1 + SOC L1) |
+| Curriculum carrière (ch. 9–16, SOC L2, atelier 5★) | Vision écrite, pas encore jouable |
+| SOC L1, certificats serveur, classe | File SIEM jouable ; co-op à venir |
 | Auth, CI, docs produit | À faire |
 
-Le prototype est un **début de carrière IT** (helpdesk → adressage → segmentation → Windows / Wi-Fi → systèmes → pfSense / MikroTik / UniFi → **atelier palier 1**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (SOC, architecture 5★). La suite utile : **E6**.
+Le prototype est un **début de carrière IT** (helpdesk → adressage → segmentation → Windows / Wi-Fi → systèmes → pfSense / MikroTik / UniFi → atelier palier 1 → **SOC L1**), avec **SLA** et **dossier de carrière**. Ce n’est pas encore l’académie complète (SOC L2, architecture 5★). La suite utile : **E7**.
 
 ---
 

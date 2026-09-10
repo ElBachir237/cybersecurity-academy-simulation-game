@@ -244,6 +244,12 @@ function readFileInternal(path: string, host: HostRuntime, state: GameState): st
       return genNetplan(host);
     case "/var/log/syslog":
       return host.logs.length ? host.logs.join("\n") + "\n" : "";
+    case "/var/log/auth.log": {
+      const auth = host.logs.filter((l) =>
+        /sshd|sudo|auth|failed password|accepted password/i.test(l)
+      );
+      return auth.length ? auth.join("\n") + "\n" : "";
+    }
     case "/home/student/README.txt":
       return [
         "Bienvenue sur votre poste HORIZON.",
@@ -1605,7 +1611,7 @@ export function execTerminal(
       } else if (path === "/etc/netplan") {
         out.push("01-netcfg.yaml");
       } else if (path === "/var/log") {
-        out.push("syslog  apt  dpkg.log");
+        out.push("syslog  auth.log  apt  dpkg.log");
       } else if (path === "/etc") {
         out.push("hostname  hosts  netplan  nginx  os-release  resolv.conf");
       } else if (path === "/etc/nginx") {

@@ -586,6 +586,24 @@ function completeE5Lab(e: GameEngine) {
   buildLabRack(e);
 }
 
+function completeE5Sim(e: GameEngine) {
+  e.startMission("e5_sim", "cable");
+  const examMail = e.state.mails.find((m) => m.subjectKey === "missions.e5_sim.mailSubject")!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  e.dispatchAction("workshop-cable", { a: "LAB-SW", b: "LAB-WEB" });
+  run(e, "LAB-PC", "curl lab.horizon.local");
+  e.sendChat("itsupport", "rapport: atelier clos");
+}
+
+function completeChapter7Ready(): GameEngine {
+  const e = completeChapter6Ready();
+  completeE5Lab(e);
+  completeE5Site(e);
+  completeE5Sim(e);
+  return e;
+}
+
 function completeE5Site(e: GameEngine) {
   e.startMission("e5_site");
   const mail = e.state.mails.find((m) => m.subjectKey === "missions.e5_site.mailTicketSubject")!;
@@ -599,6 +617,31 @@ function completeE5Site(e: GameEngine) {
   run(e, "LAB-WEB", "sudo ln -s /etc/nginx/sites-available/lab.horizon.local /etc/nginx/sites-enabled/lab.horizon.local");
   run(e, "LAB-PC", "curl lab.horizon.local");
   e.sendChat("itsupport", "lab.horizon.local 200");
+}
+
+function triageNoise(e: GameEngine) {
+  for (const a of e.state.world.socAlerts ?? []) {
+    if (!a.truePositive) e.dispatchAction("soc-fp", { id: a.id });
+  }
+}
+
+function completeE6Lab(e: GameEngine) {
+  e.startMission("e6_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  triageNoise(e);
+  run(e, "SRV-WEB", "journalctl -u sshd");
+  e.dispatchAction("soc-escalate", { id: "SOC-8009" });
+  e.sendChat("soc", "SSH-BRUTE confirme");
+}
+
+function completeE6Phish(e: GameEngine) {
+  e.startMission("e6_phish");
+  const phish = e.state.mails.find((m) => m.subjectKey === "missions.e6_phish.mailSubject")!;
+  e.readMail(phish.id);
+  e.answerDecision("A");
+  e.dispatchAction("mail-report-phish", { mailId: phish.id });
+  e.dispatchAction("soc-escalate", { id: "SOC-8101" });
+  e.sendChat("soc", "phishing signale");
 }
 
 console.log("\n[6] CHAPTER 2 LAB c2_lab");
@@ -1597,6 +1640,114 @@ console.log("\n[40] OLD SAVE — missing e5_lab runtime still starts after chapt
   e.startMission("e5_lab");
   assert(e.state.activeMissionId === "e5_lab", "e5_lab starts from a save that lacked workshop runtimes");
   assert(Array.isArray(e.state.world.workshop?.nodes), "workshop hydrated");
+}
+
+console.log("\n[41] CHAPTER 8 LAB e6_lab");
+{
+  const e = completeChapter7Ready();
+  assert(e.state.missions["e6_lab"].status === "available", "e6_lab unlocked after chapter 7");
+  e.startMission("e6_lab");
+  if (e.state.pendingDecision) e.answerDecision("B");
+  assert((e.state.world.socAlerts ?? []).length === 10, "10 SIEM alerts queued");
+  assert(e.state.world.hosts["SRV-WEB"]?.logs.some((l) => l.includes("Failed password")), "brute logs on SRV-WEB");
+  triageNoise(e);
+  const logs = run(e, "SRV-WEB", "journalctl -u sshd").join("\n");
+  assert(logs.includes("Failed password"), "sshd failures visible in journalctl");
+  e.dispatchAction("soc-escalate", { id: "SOC-8009" });
+  e.sendChat("soc", "SSH-BRUTE confirme sur SRV-WEB, bruit ferme.");
+  assert(e.state.missions["e6_lab"].status === "completed", "e6_lab completed");
+  assert(e.state.badges.includes("soc_triage"), "badge soc_triage");
+  assert(e.state.missions["e6_phish"].status === "available", "e6_phish unlocked");
+}
+
+console.log("\n[41b] CHAPTER 8 ERROR — dump queue to Soriya");
+{
+  const e = completeChapter7Ready();
+  e.startMission("e6_lab");
+  assert(e.state.pendingDecision?.id === "e6_dump", "dump-queue decision shown");
+  e.answerDecision("A");
+  e.closeLearning();
+  assert(e.state.missions["e6_lab"].errorKeys.includes("flood_soriya"), "flood_soriya recorded");
+  triageNoise(e);
+  run(e, "SRV-WEB", "journalctl -u sshd");
+  e.dispatchAction("soc-escalate", { id: "SOC-8009" });
+  e.sendChat("soc", "quand meme");
+  assert(e.state.missions["e6_lab"].status === "completed", "still completable");
+  assert(e.state.missions["e6_lab"].score < 100, "score penalized");
+}
+
+console.log("\n[42] CHAPTER 8 MISSION e6_phish");
+{
+  const e = completeChapter7Ready();
+  completeE6Lab(e);
+  e.startMission("e6_phish");
+  const phish = e.state.mails.find((m) => m.subjectKey === "missions.e6_phish.mailSubject")!;
+  e.readMail(phish.id);
+  e.answerDecision("A");
+  e.dispatchAction("mail-report-phish", { mailId: phish.id });
+  e.dispatchAction("soc-escalate", { id: "SOC-8101" });
+  e.sendChat("soc", "phishing horiz0n signale, pas de clic.");
+  assert(e.state.missions["e6_phish"].status === "completed", "e6_phish completed");
+  assert(e.state.missions["e6_sim"].status === "available", "e6_sim unlocked");
+}
+
+console.log("\n[42b] CHAPTER 8 ERROR — click phishing");
+{
+  const e = completeChapter7Ready();
+  completeE6Lab(e);
+  e.startMission("e6_phish");
+  const phish = e.state.mails.find((m) => m.subjectKey === "missions.e6_phish.mailSubject")!;
+  e.readMail(phish.id);
+  assert(e.state.pendingDecision?.id === "e6p_click", "click decision shown");
+  e.answerDecision("B");
+  e.closeLearning();
+  assert(e.state.missions["e6_phish"].errorKeys.includes("phish_click"), "phish_click recorded");
+  e.dispatchAction("mail-report-phish", { mailId: phish.id });
+  e.sendChat("soc", "signale apres clic");
+  assert(e.state.missions["e6_phish"].status === "completed", "still completable");
+  assert(e.state.missions["e6_phish"].score < 100, "score penalized");
+}
+
+for (const variant of ["noise", "brute", "phish"] as const) {
+  console.log(`\n[43] SIM e6_sim variant=${variant}`);
+  const e = completeChapter7Ready();
+  completeE6Lab(e);
+  completeE6Phish(e);
+  e.startMission("e6_sim", variant);
+  assert(e.state.missions["e6_sim"].variant === variant, `variant is ${variant}`);
+  const examMail = e.state.mails.find((m) =>
+    m.subjectKey === "missions.e6_sim.mailSubject" || m.subjectKey === "missions.e6_phish.mailSubject"
+  )!;
+  e.readMail(examMail.id);
+  e.answerDecision("A");
+  if (variant === "noise") {
+    triageNoise(e);
+  } else if (variant === "brute") {
+    run(e, "SRV-WEB", "journalctl -u sshd");
+    e.dispatchAction("soc-escalate", { id: "SOC-8009" });
+  } else {
+    e.dispatchAction("mail-report-phish", { mailId: examMail.id });
+    e.dispatchAction("soc-escalate", { id: "SOC-8101" });
+  }
+  e.sendChat("soc", "rapport: quart L1 clos");
+  const s = e.state.missions["e6_sim"];
+  assert(s.status === "completed", `[${variant}] sim completed (status=${s.status})`);
+  assert(
+    e.state.certificates.some((c) => c.titleKey === "SOC Analyst L1"),
+    `[${variant}] SOC Analyst L1 certificate`
+  );
+  assert(e.state.chapter >= 9, `[${variant}] chapter advanced`);
+}
+
+console.log("\n[44] OLD SAVE — missing e6_lab runtime still starts after chapter 7");
+{
+  const e = completeChapter7Ready();
+  delete e.state.missions["e6_lab"];
+  delete e.state.missions["e6_phish"];
+  delete e.state.missions["e6_sim"];
+  e.startMission("e6_lab");
+  assert(e.state.activeMissionId === "e6_lab", "e6_lab starts from a save that lacked SOC runtimes");
+  assert(Array.isArray(e.state.world.socAlerts), "socAlerts hydrated");
 }
 
 console.log(failures === 0 ? "\nALL SMOKE TESTS PASSED" : `\n${failures} FAILURE(S)`);
