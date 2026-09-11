@@ -14,7 +14,7 @@ How HORIZON Cyber Academy syncs between client (browser) and cloud (PostgreSQL v
 │  │  - Manages game state (missions, world, dossier, etc) │ │
 │  │  - localStorage: Primary (always available)           │ │
 │  │  - cloudSync: Optional (push/pull to PostgreSQL)      │ │
-│  └─────────���──────────────────────────────────────────────┘ │
+│  └────────────────────────────────────────────────────────┘ │
 └──────────────────────┬──────────────────────────────────────┘
                        │ HTTP (Bearer token)
                        │
